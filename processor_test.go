@@ -5,23 +5,29 @@ import (
 	"testing"
 )
 
-func TestProcess (t *testing.T) {
-	p := Processor{}
-	got := p.Process([]string{"source1", "source2"})
-	want := map[string]string{
-		"source1": "source1",
-		"source2": "source2",
-	}
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("Wanted %v, got %v", want, got)
-	}
+type MemoryOutput map[string]string
+
+func (m MemoryOutput) Put(name, result string) error {
+	m[name] = result
+	return nil
 }
 
-func BenchmarkProcess(b *testing.B) {
-	input := make([]string, 100)
-	for i := 0; i < len(input); i++ {
-		input[i] = "source"
+func TestProcessor_Process (t *testing.T) {
+	output := MemoryOutput{}
+	processor := Processor{Output: output}
+	fileProvider := MapFileProvider{
+		"1st.txt": "first",
+		"2nd.txt": "second",
 	}
-	p := Processor{}
-	p.Process(input)
+	err := processor.Process(fileProvider)
+	if err != nil {
+		t.Errorf("Unexpected error %#v", err)
+	}
+	expected := MemoryOutput{
+		"1st.txt": "1st.txt",
+		"2nd.txt": "2nd.txt",
+	}
+	if !reflect.DeepEqual(expected, output) {
+		t.Errorf("Expected %v, got %v", expected, output)
+	}
 }

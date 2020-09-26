@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
 )
 
 func main() {
-	p := Processor{}
-	result := p.Process(os.Args[1:])
-	fmt.Println(result)
+	output := TextOutput{os.Stdout}
+	processor := Processor{Output: output}
+	processor.Process(os.Args[1:])
 }
