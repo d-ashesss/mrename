@@ -102,3 +102,30 @@ func TestDirectoryFileProvider_Open(t *testing.T) {
 		}
 	})
 }
+
+func TestDirectoryFileProvider_Move(t *testing.T) {
+	fs := makeTestFs()
+	provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+	fileInfo := MemoryFile{name: "1st.txt"}
+	err := provider.Rename(fileInfo, "the1st.txt")
+	if err != nil {
+		t.Errorf("Expected no error, got %#v", err)
+	}
+	if _, err := fs.Stat("target/1st.txt"); err == nil {
+		t.Error("Original file still exists")
+	}
+	if _, err := fs.Stat("target/the1st.txt"); err != nil {
+		t.Error("New file does not exist")
+	}
+
+	t.Run("file does not exist", func(t *testing.T) {
+		fileInfo := MemoryFile{name: "0th.txt"}
+		err := provider.Rename(fileInfo, "the0th.txt")
+		if err == nil {
+			t.Error("Expected an error")
+		}
+		if _, err := fs.Stat("the0th.txt"); err == nil {
+			t.Error("Invalid file was created")
+		}
+	})
+}

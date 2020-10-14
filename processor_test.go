@@ -47,9 +47,17 @@ func (m MapFileProvider) Open(info FileInfo) (io.Reader, error) {
 	return bytes.NewBufferString(content), nil
 }
 
+func (m MapFileProvider) Rename(info FileInfo, dstName string) error {
+	content := m[info.Name()]
+	delete(m, info.Name())
+	m[dstName] = content
+	return nil
+}
+
 type ErrorFileProvider struct {
-	GetError error
-	OpenError error
+	GetError    error
+	OpenError   error
+	RenameError error
 }
 
 func (e ErrorFileProvider) GetFiles() ([]FileInfo, error) {
@@ -58,6 +66,10 @@ func (e ErrorFileProvider) GetFiles() ([]FileInfo, error) {
 
 func (e ErrorFileProvider) Open(_ FileInfo) (io.Reader, error) {
 	return nil, e.OpenError
+}
+
+func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
+	return e.RenameError
 }
 
 func TestProcessor_Process(t *testing.T) {
@@ -71,7 +83,7 @@ func TestProcessor_Process(t *testing.T) {
 	}
 	err := processor.Process(fileProvider)
 	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
+		t.Errorf("Unexpected processing error %#v", err)
 	}
 	expected := MemoryOutput{
 		"1st.txt": "first.txt",
@@ -81,6 +93,41 @@ func TestProcessor_Process(t *testing.T) {
 	if !reflect.DeepEqual(expected, output) {
 		t.Errorf("Expected %v, got %v", expected, output)
 	}
+	if _, ok := fileProvider["1st.txt"]; ok {
+		t.Error("Original file was not removed")
+	}
+	if _, ok := fileProvider["first.txt"]; !ok {
+		t.Error("File was not renamed")
+	}
+
+	t.Run("DryRun", func(t *testing.T) {
+		output := MemoryOutput{}
+		converter := PlainConverter{}
+		processor := Processor{Output: output, Converter: converter, DryRun: true}
+		fileProvider := MapFileProvider{
+			"1st.txt": "first",
+			"2nd.txt": "second",
+			"3rd":     "third",
+		}
+		err := processor.Process(fileProvider)
+		if err != nil {
+			t.Errorf("Unexpected processing error %#v", err)
+		}
+		expected := MemoryOutput{
+			"1st.txt": "first.txt",
+			"2nd.txt": "second.txt",
+			"3rd":     "third",
+		}
+		if !reflect.DeepEqual(expected, output) {
+			t.Errorf("Expected %v, got %v", expected, output)
+		}
+		if _, ok := fileProvider["1st.txt"]; !ok {
+			t.Error("Original file was removed")
+		}
+		if _, ok := fileProvider["first.txt"]; ok {
+			t.Error("File was renamed")
+		}
+	})
 
 	t.Run("ProviderError", func(t *testing.T) {
 		testError := errors.New("test")

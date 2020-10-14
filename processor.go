@@ -5,6 +5,7 @@ import "path"
 type Processor struct {
 	Output    ResultAggregator
 	Converter Converter
+	DryRun    bool
 }
 
 func (p *Processor) Process(provider FileProvider) error {
@@ -18,7 +19,13 @@ func (p *Processor) Process(provider FileProvider) error {
 		if ext := path.Ext(file.Name()); ext != "" {
 			newName += ext
 		}
-		_ = p.Output.Put(file.Name(), newName)
+		var err error
+		if !p.DryRun {
+			err = provider.Rename(file, newName)
+		}
+		if err == nil {
+			_ = p.Output.Put(file.Name(), newName)
+		}
 	}
 	return nil
 }

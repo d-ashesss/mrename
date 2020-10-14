@@ -13,6 +13,7 @@ type FileInfo interface {
 type FileProvider interface {
 	GetFiles() ([]FileInfo, error)
 	Open(info FileInfo) (io.Reader, error)
+	Rename(info FileInfo, dstName string) error
 }
 
 type DirectoryFileProvider struct {
@@ -41,4 +42,10 @@ func (d DirectoryFileProvider) Open(info FileInfo) (io.Reader, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+func (d DirectoryFileProvider) Rename(info FileInfo, dstName string) error {
+	filePath := path.Join(d.Directory, info.Name())
+	dstPath := path.Join(d.Directory, dstName)
+	return d.Fs.Rename(filePath, dstPath)
 }
