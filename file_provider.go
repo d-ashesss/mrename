@@ -1,6 +1,10 @@
 package main
 
-import "github.com/spf13/afero"
+import (
+	"github.com/spf13/afero"
+	"io"
+	"path"
+)
 
 type FileInfo interface {
 	Name() string
@@ -8,10 +12,11 @@ type FileInfo interface {
 
 type FileProvider interface {
 	GetFiles() ([]FileInfo, error)
+	Open(info FileInfo) (io.Reader, error)
 }
 
 type DirectoryFileProvider struct {
-	Fs afero.Fs
+	Fs        afero.Fs
 	Directory string
 }
 
@@ -27,4 +32,13 @@ func (d DirectoryFileProvider) GetFiles() ([]FileInfo, error) {
 		}
 	}
 	return files, nil
+}
+
+func (d DirectoryFileProvider) Open(info FileInfo) (io.Reader, error) {
+	filePath := path.Join(d.Directory, info.Name())
+	file, err := d.Fs.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	return file, nil
 }

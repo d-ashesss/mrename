@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/spf13/afero"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -72,6 +73,32 @@ func TestDirectoryFileProvider_GetFiles(t *testing.T) {
 		var expected []FileInfo
 		if !reflect.DeepEqual(expected, providedFiles) {
 			t.Errorf("Expected files %v, got %v", expected, providedFiles)
+		}
+	})
+}
+
+func TestDirectoryFileProvider_Open(t *testing.T) {
+	fs := makeTestFs()
+	provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+	fileInfo := MemoryFile{name: "1st.txt"}
+	file, err := provider.Open(fileInfo)
+	if err != nil {
+		t.Errorf("Expected no error, got %#v", err)
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		t.Errorf("Expected no reading error, got %#v", err)
+	}
+	expected := "first"
+	if expected != string(content) {
+		t.Errorf("Expected content %v, got %v", expected, content)
+	}
+
+	t.Run("file does not exist", func(t *testing.T) {
+		fileInfo := MemoryFile{name: "0th.txt"}
+		_, err := provider.Open(fileInfo)
+		if err == nil {
+			t.Error("Expected an error")
 		}
 	})
 }
