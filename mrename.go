@@ -5,23 +5,27 @@ import (
 	"fmt"
 	"github.com/spf13/afero"
 	flag "github.com/spf13/pflag"
+	"log"
 	"os"
 )
 
 var (
 	dryRun bool
+	verbose bool
 )
 
 func init() {
-	flag.BoolVarP(&dryRun, "dry-run", "n", false, "Do not actually rename files.")
+	flag.BoolVarP(&dryRun, "dry-run", "n", false, "Do not actually rename files")
+	flag.BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	flag.Parse()
 }
 
 func main() {
-	output := TextOutput{os.Stdout}
+	logger := log.New(os.Stderr, "", 0)
+	progress := LoggedProgress{Logger: logger, Verbose: verbose}
 	hash := md5.New()
 	converter := HashConverter{Hash: hash}
-	processor := Processor{Output: output, Converter: converter, DryRun: dryRun}
+	processor := Processor{Progress: progress, Converter: converter, DryRun: dryRun}
 	fileProvider := DirectoryFileProvider{Fs: afero.NewOsFs(), Directory: "."}
 	err := processor.Process(fileProvider)
 	if err != nil {

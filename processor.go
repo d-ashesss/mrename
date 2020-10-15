@@ -3,7 +3,7 @@ package main
 import "path"
 
 type Processor struct {
-	Output    ResultAggregator
+	Progress  ProgressAggregator
 	Converter Converter
 	DryRun    bool
 }
@@ -24,7 +24,7 @@ func (p *Processor) Process(provider FileProvider) error {
 			err = provider.Rename(file, newName)
 		}
 		if err == nil {
-			_ = p.Output.Put(file.Name(), newName)
+			p.Progress.AddResult(file.Name(), newName)
 		}
 	}
 	return nil

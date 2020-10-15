@@ -13,6 +13,7 @@ mrename [options]
 ### Options
 
 - `-n`, `--dry-run` Do not actually rename the files
+- `-v`, `--verbose` Show detailed output
 
 
 ### Warning
