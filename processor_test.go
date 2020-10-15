@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"log"
 	"reflect"
 	"testing"
 )
@@ -68,14 +69,16 @@ func (e ErrorFileProvider) Open(_ FileInfo) (io.Reader, error) {
 	return nil, e.OpenError
 }
 
-func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
+func (e ErrorFileProvider) Rename(_ FileInfo, _ string) error {
 	return e.RenameError
 }
 
 func TestProcessor_Process(t *testing.T) {
 	output := MemoryProgress{}
 	converter := PlainConverter{}
-	processor := Processor{Progress: output, Converter: converter}
+	var logBuffer bytes.Buffer
+	logger := log.New(&logBuffer, "", 0)
+	processor := Processor{Progress: output, Converter: converter, Logger: logger}
 	fileProvider := MapFileProvider{
 		"1st.txt": "first",
 		"2nd.txt": "second",
@@ -85,13 +88,13 @@ func TestProcessor_Process(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected processing error %#v", err)
 	}
-	expected := MemoryProgress{
+	expectedProgress := MemoryProgress{
 		"1st.txt": "first.txt",
 		"2nd.txt": "second.txt",
 		"3rd":     "third",
 	}
-	if !reflect.DeepEqual(expected, output) {
-		t.Errorf("Expected %v, got %v", expected, output)
+	if !reflect.DeepEqual(expectedProgress, output) {
+		t.Errorf("Expected %v, got %v", expectedProgress, output)
 	}
 	if _, ok := fileProvider["1st.txt"]; ok {
 		t.Error("Original file was not removed")
@@ -99,11 +102,17 @@ func TestProcessor_Process(t *testing.T) {
 	if _, ok := fileProvider["first.txt"]; !ok {
 		t.Error("File was not renamed")
 	}
+	expectedLog := ""
+	if expectedLog != logBuffer.String() {
+		t.Errorf("Expected empty log, got %v", logBuffer.String())
+	}
 
 	t.Run("DryRun", func(t *testing.T) {
 		output := MemoryProgress{}
 		converter := PlainConverter{}
-		processor := Processor{Progress: output, Converter: converter, DryRun: true}
+		var logBuffer bytes.Buffer
+		logger := log.New(&logBuffer, "", 0)
+		processor := Processor{Progress: output, Converter: converter, DryRun: true, Logger: logger}
 		fileProvider := MapFileProvider{
 			"1st.txt": "first",
 			"2nd.txt": "second",
@@ -113,13 +122,13 @@ func TestProcessor_Process(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected processing error %#v", err)
 		}
-		expected := MemoryProgress{
+		expectedProgress := MemoryProgress{
 			"1st.txt": "first.txt",
 			"2nd.txt": "second.txt",
 			"3rd":     "third",
 		}
-		if !reflect.DeepEqual(expected, output) {
-			t.Errorf("Expected %v, got %v", expected, output)
+		if !reflect.DeepEqual(expectedProgress, output) {
+			t.Errorf("Expected %v, got %v", expectedProgress, output)
 		}
 		if _, ok := fileProvider["1st.txt"]; !ok {
 			t.Error("Original file was removed")
@@ -127,9 +136,16 @@ func TestProcessor_Process(t *testing.T) {
 		if _, ok := fileProvider["first.txt"]; ok {
 			t.Error("File was renamed")
 		}
+		expectedLog := ""
+		if expectedLog != logBuffer.String() {
+			t.Errorf("Expected empty log, got %v", logBuffer.String())
+		}
 	})
 
 	t.Run("ProviderError", func(t *testing.T) {
+		var logBuffer bytes.Buffer
+		logger := log.New(&logBuffer, "", 0)
+		processor := Processor{Progress: output, Converter: converter, Logger: logger}
 		testError := errors.New("test")
 		fileProvider := ErrorFileProvider{GetError: testError}
 		err := processor.Process(fileProvider)

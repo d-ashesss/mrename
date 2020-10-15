@@ -1,11 +1,15 @@
 package main
 
-import "path"
+import (
+	"log"
+	"path"
+)
 
 type Processor struct {
 	Progress  ProgressAggregator
 	Converter Converter
 	DryRun    bool
+	Logger    *log.Logger
 }
 
 func (p *Processor) Process(provider FileProvider) error {
