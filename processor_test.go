@@ -56,104 +56,202 @@ func (m MapFileProvider) Rename(info FileInfo, dstName string) error {
 }
 
 type ErrorFileProvider struct {
+	Files       MapFileProvider
 	GetError    error
 	OpenError   error
 	RenameError error
 }
 
 func (e ErrorFileProvider) GetFiles() ([]FileInfo, error) {
+	if e.GetError == nil {
+		return e.Files.GetFiles()
+	}
 	return nil, e.GetError
 }
 
-func (e ErrorFileProvider) Open(_ FileInfo) (io.Reader, error) {
+func (e ErrorFileProvider) Open(info FileInfo) (io.Reader, error) {
+	if e.OpenError == nil {
+		return e.Files.Open(info)
+	}
 	return nil, e.OpenError
 }
 
-func (e ErrorFileProvider) Rename(_ FileInfo, _ string) error {
+func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
+	if e.RenameError == nil {
+		return e.Files.Rename(info, dstName)
+	}
 	return e.RenameError
 }
 
-func TestProcessor_Process(t *testing.T) {
-	output := MemoryProgress{}
+type TrackingProcessor struct {
+	processed map[string]string
+}
+
+func (t *TrackingProcessor) Process(info FileInfo, _ FileProvider) {
+	t.processed[ info.Name() ] = info.Name()
+}
+
+type processorTest struct {
+	Progress ProgressAggregator
+	Converter Converter
+	LogBuffer *bytes.Buffer
+	Logger *log.Logger
+	Processor *FileProcessor
+	FileProvider MapFileProvider
+}
+
+func setUpFileProcessorTest() processorTest {
+	progress := MemoryProgress{}
 	converter := PlainConverter{}
 	var logBuffer bytes.Buffer
 	logger := log.New(&logBuffer, "", 0)
-	processor := Processor{Progress: output, Converter: converter, Logger: logger}
+	processor := FileProcessor{Progress: progress, Converter: converter, Logger: logger}
 	fileProvider := MapFileProvider{
 		"1st.txt": "first",
 		"2nd.txt": "second",
 		"3rd":     "third",
 	}
-	err := processor.Process(fileProvider)
-	if err != nil {
-		t.Errorf("Unexpected processing error %#v", err)
+
+	return processorTest{
+		Progress:     progress,
+		Converter:    converter,
+		LogBuffer:    &logBuffer,
+		Logger:       logger,
+		Processor:    &processor,
+		FileProvider: fileProvider,
 	}
+}
+
+func TestFileProcessor_Process(t *testing.T) {
+	test := setUpFileProcessorTest()
+	fileInfo := MemoryFile{name: "1st.txt"}
+	test.Processor.Process(fileInfo, test.FileProvider)
+
 	expectedProgress := MemoryProgress{
 		"1st.txt": "first.txt",
-		"2nd.txt": "second.txt",
-		"3rd":     "third",
 	}
-	if !reflect.DeepEqual(expectedProgress, output) {
-		t.Errorf("Expected %v, got %v", expectedProgress, output)
+	if !reflect.DeepEqual(expectedProgress, test.Progress) {
+		t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
 	}
-	if _, ok := fileProvider["1st.txt"]; ok {
+	if _, ok := test.FileProvider["1st.txt"]; ok {
 		t.Error("Original file was not removed")
 	}
-	if _, ok := fileProvider["first.txt"]; !ok {
+	if _, ok := test.FileProvider["first.txt"]; !ok {
 		t.Error("File was not renamed")
 	}
 	expectedLog := ""
-	if expectedLog != logBuffer.String() {
-		t.Errorf("Expected empty log, got %v", logBuffer.String())
+	if expectedLog != test.LogBuffer.String() {
+		t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
 	}
 
-	t.Run("DryRun", func(t *testing.T) {
-		output := MemoryProgress{}
-		converter := PlainConverter{}
-		var logBuffer bytes.Buffer
-		logger := log.New(&logBuffer, "", 0)
-		processor := Processor{Progress: output, Converter: converter, DryRun: true, Logger: logger}
-		fileProvider := MapFileProvider{
-			"1st.txt": "first",
-			"2nd.txt": "second",
-			"3rd":     "third",
-		}
-		err := processor.Process(fileProvider)
-		if err != nil {
-			t.Errorf("Unexpected processing error %#v", err)
-		}
+	t.Run("no file extension", func(t *testing.T) {
+		processorTest := setUpFileProcessorTest()
+		fileInfo := MemoryFile{name: "3rd"}
+		processorTest.Processor.Process(fileInfo, processorTest.FileProvider)
+
 		expectedProgress := MemoryProgress{
-			"1st.txt": "first.txt",
-			"2nd.txt": "second.txt",
-			"3rd":     "third",
+			"3rd": "third",
 		}
-		if !reflect.DeepEqual(expectedProgress, output) {
-			t.Errorf("Expected %v, got %v", expectedProgress, output)
-		}
-		if _, ok := fileProvider["1st.txt"]; !ok {
-			t.Error("Original file was removed")
-		}
-		if _, ok := fileProvider["first.txt"]; ok {
-			t.Error("File was renamed")
-		}
-		expectedLog := ""
-		if expectedLog != logBuffer.String() {
-			t.Errorf("Expected empty log, got %v", logBuffer.String())
+		if !reflect.DeepEqual(expectedProgress, processorTest.Progress) {
+			t.Errorf("Expected progress %v, got %v", expectedProgress, processorTest.Progress)
 		}
 	})
 
-	t.Run("ProviderError", func(t *testing.T) {
-		var logBuffer bytes.Buffer
-		logger := log.New(&logBuffer, "", 0)
-		processor := Processor{Progress: output, Converter: converter, Logger: logger}
-		testError := errors.New("test")
+	t.Run("dry run", func(t *testing.T) {
+		test := setUpFileProcessorTest()
+		test.Processor.DryRun = true
+		fileInfo := MemoryFile{name: "1st.txt"}
+		test.Processor.Process(fileInfo, test.FileProvider)
+
+		expectedProgress := MemoryProgress{
+			"1st.txt": "first.txt",
+		}
+		if !reflect.DeepEqual(expectedProgress, test.Progress) {
+			t.Errorf("Expected %v, got %v", expectedProgress, test.Progress)
+		}
+		if _, ok := test.FileProvider["1st.txt"]; !ok {
+			t.Error("Original file was removed")
+		}
+		if _, ok := test.FileProvider["first.txt"]; ok {
+			t.Error("File was renamed")
+		}
+		expectedLog := ""
+		if expectedLog != test.LogBuffer.String() {
+			t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
+		}
+	})
+
+	t.Run("file open error", func(t *testing.T) {
+		test := setUpFileProcessorTest()
+		fileInfo := MemoryFile{name: "1st.txt"}
+		testError := errors.New("test file can't be opened")
+		fileProvider := ErrorFileProvider{OpenError: testError}
+		test.Processor.Process(fileInfo, fileProvider)
+
+		expectedProgress := MemoryProgress{}
+		if !reflect.DeepEqual(expectedProgress, test.Progress) {
+			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
+		}
+		expectedLog := "1st.txt: test file can't be opened\n"
+		if expectedLog != test.LogBuffer.String() {
+			t.Errorf("Expected logged file open error, got %v", test.LogBuffer.String())
+		}
+	})
+
+	t.Run("file rename error", func(t *testing.T) {
+		test := setUpFileProcessorTest()
+		fileInfo := MemoryFile{name: "1st.txt"}
+		testError := errors.New("test file can't be renamed")
+		fileProvider := ErrorFileProvider{Files: MapFileProvider{"1st.txt": "first"}, RenameError: testError}
+		test.Processor.Process(fileInfo, fileProvider)
+
+		expectedProgress := MemoryProgress{}
+		if !reflect.DeepEqual(expectedProgress, test.Progress) {
+			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
+		}
+		expectedLog := "1st.txt: test file can't be renamed\n"
+		if expectedLog != test.LogBuffer.String() {
+			t.Errorf("Expected logged file rename error, got %v", test.LogBuffer.String())
+		}
+	})
+}
+
+func TestBulkProcessor_Process(t *testing.T) {
+	fileProcessor := TrackingProcessor{map[string]string{}}
+	processor := BulkProcessor{FileProcessor: &fileProcessor}
+
+	fileProvider := ErrorFileProvider{
+		Files: MapFileProvider{
+			"1st.txt": "first",
+			"2nd.txt": "second",
+			"3rd":     "third",
+		},
+	}
+	_ = processor.Process(fileProvider)
+
+	expectedProcessed := map[string]string{"1st.txt": "1st.txt", "2nd.txt": "2nd.txt", "3rd": "3rd"}
+	if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
+		t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
+	}
+
+	t.Run("get files error", func(t *testing.T) {
+		fileProcessor := TrackingProcessor{map[string]string{}}
+		processor := BulkProcessor{FileProcessor: &fileProcessor}
+
+		testError := errors.New("test files can't be listed")
 		fileProvider := ErrorFileProvider{GetError: testError}
 		err := processor.Process(fileProvider)
+
 		if err == nil {
 			t.Error("Expected error, none given")
 		}
 		if err != testError {
 			t.Errorf("Expected test error, got %#v", err)
+		}
+
+		expectedProcessed := map[string]string{}
+		if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
+			t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
 		}
 	})
 }

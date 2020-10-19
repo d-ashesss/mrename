@@ -25,7 +25,8 @@ func main() {
 	progress := LoggedProgress{Logger: logger, Verbose: verbose}
 	hash := md5.New()
 	converter := HashConverter{Hash: hash}
-	processor := Processor{Progress: progress, Converter: converter, DryRun: dryRun}
+	fileProcessor := FileProcessor{Progress: progress, Converter: converter, DryRun: dryRun}
+	processor := BulkProcessor{FileProcessor: &fileProcessor}
 	fileProvider := DirectoryFileProvider{Fs: afero.NewOsFs(), Directory: "."}
 	err := processor.Process(fileProvider)
 	if err != nil {
