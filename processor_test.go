@@ -8,6 +8,7 @@ import (
 	"log"
 	"reflect"
 	"testing"
+	"time"
 )
 
 type MemoryProgress map[string]string
@@ -55,6 +56,24 @@ func (m MapFileProvider) Rename(info FileInfo, dstName string) error {
 	return nil
 }
 
+type VolumeFileProvider int
+
+func (v VolumeFileProvider) GetFiles() ([]FileInfo, error) {
+	files := make([]FileInfo, 0, v)
+	for i := 0; i < int(v); i++ {
+		files = append(files, MemoryFile{name: "test"})
+	}
+	return files, nil
+}
+
+func (v VolumeFileProvider) Open(_ FileInfo) (io.Reader, error) {
+	panic("method not available")
+}
+
+func (v VolumeFileProvider) Rename(_ FileInfo, _ string) error {
+	panic("method not available")
+}
+
 type ErrorFileProvider struct {
 	Files       MapFileProvider
 	GetError    error
@@ -89,6 +108,12 @@ type TrackingProcessor struct {
 
 func (t *TrackingProcessor) Process(info FileInfo, _ FileProvider) {
 	t.processed[ info.Name() ] = info.Name()
+}
+
+type TimedProcessor time.Duration
+
+func (p TimedProcessor) Process(_ FileInfo, _ FileProvider) {
+	time.Sleep(time.Duration(p))
 }
 
 type processorTest struct {
@@ -254,4 +279,12 @@ func TestBulkProcessor_Process(t *testing.T) {
 			t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
 		}
 	})
+}
+
+func BenchmarkBulkProcessor_Process(b *testing.B) {
+	fileProcessor := TimedProcessor(100 * time.Microsecond)
+	processor := BulkProcessor{FileProcessor: &fileProcessor}
+
+	fileProvider := VolumeFileProvider(b.N)
+	_ = processor.Process(fileProvider)
 }

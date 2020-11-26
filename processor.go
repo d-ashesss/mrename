@@ -46,8 +46,16 @@ func (p *BulkProcessor) Process(provider FileProvider) error {
 	if err != nil {
 		return err
 	}
+
+	resultChannel := make(chan bool)
 	for _, file := range files {
-		p.FileProcessor.Process(file, provider)
+		go func(file FileInfo) {
+			p.FileProcessor.Process(file, provider)
+			resultChannel <- true
+		}(file)
+	}
+	for i := 0; i < len(files); i++ {
+		<-resultChannel
 	}
 	return nil
 }
