@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/md5"
 	"errors"
 	"testing"
 )
@@ -15,10 +14,9 @@ func (f FailingReader) Read(_ []byte) (int, error) {
 	return 0, f.Error
 }
 
-func TestHashConverter_Convert(t *testing.T) {
+func TestMd5Converter_Convert(t *testing.T) {
 	buffer := bytes.NewBufferString("testing content")
-	hash := md5.New()
-	converter := HashConverter{Hash: hash}
+	converter := Md5Converter{}
 	got, _ := converter.Convert(buffer)
 	expected := "b91a4b2655c770f90410dc67dc407633"
 	if expected != got {

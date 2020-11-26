@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
 	"fmt"
 	"github.com/spf13/afero"
 	flag "github.com/spf13/pflag"
@@ -23,8 +22,7 @@ func init() {
 func main() {
 	logger := log.New(os.Stderr, "", 0)
 	progress := LoggedProgress{Logger: logger, Verbose: verbose}
-	hash := md5.New()
-	converter := HashConverter{Hash: hash}
+	converter := Md5Converter{}
 	fileProcessor := FileProcessor{Progress: progress, Converter: converter, DryRun: dryRun}
 	processor := BulkProcessor{FileProcessor: &fileProcessor}
 	fileProvider := DirectoryFileProvider{Fs: afero.NewOsFs(), Directory: "."}
