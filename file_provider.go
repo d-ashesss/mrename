@@ -13,6 +13,7 @@ type FileInfo interface {
 type FileProvider interface {
 	GetFiles() ([]FileInfo, error)
 	Open(info FileInfo) (io.Reader, error)
+	MkDir(path string) error
 	Rename(info FileInfo, dstName string) error
 }
 
@@ -42,6 +43,13 @@ func (d DirectoryFileProvider) Open(info FileInfo) (io.Reader, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+func (d DirectoryFileProvider) MkDir(path string) error {
+	if len(path) == 0 {
+		return nil
+	}
+	return d.Fs.MkdirAll(path, 0744)
 }
 
 func (d DirectoryFileProvider) Rename(info FileInfo, dstName string) error {

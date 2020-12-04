@@ -2,11 +2,11 @@ package main
 
 import (
 	"log"
-	"path"
+	"path/filepath"
 )
 
 type Processor interface {
-	Process(info FileInfo, provider FileProvider)
+	Process(info FileInfo, targetDir string, provider FileProvider)
 }
 
 type FileProcessor struct {
@@ -16,7 +16,7 @@ type FileProcessor struct {
 	DryRun    bool
 }
 
-func (f *FileProcessor) Process(info FileInfo, provider FileProvider)  {
+func (f *FileProcessor) Process(info FileInfo, targetDir string, provider FileProvider) {
 	var err error
 	file, err := provider.Open(info)
 	if err != nil {
@@ -24,11 +24,12 @@ func (f *FileProcessor) Process(info FileInfo, provider FileProvider)  {
 		return
 	}
 	newName, _ := f.Converter.Convert(file)
-	if ext := path.Ext(info.Name()); ext != "" {
+	if ext := filepath.Ext(info.Name()); ext != "" {
 		newName += ext
 	}
+	newPath := filepath.Join(targetDir, newName)
 	if !f.DryRun {
-		err = provider.Rename(info, newName)
+		err = provider.Rename(info, newPath)
 	}
 	if err != nil {
 		f.Logger.Printf("%v: %v", info.Name(), err)
@@ -39,6 +40,7 @@ func (f *FileProcessor) Process(info FileInfo, provider FileProvider)  {
 
 type BulkProcessor struct {
 	FileProcessor Processor
+	Target        string
 }
 
 func (p *BulkProcessor) Process(provider FileProvider) error {
@@ -47,10 +49,15 @@ func (p *BulkProcessor) Process(provider FileProvider) error {
 		return err
 	}
 
+	err = provider.MkDir(p.Target)
+	if err != nil {
+		return err
+	}
+
 	resultChannel := make(chan bool)
 	for _, file := range files {
 		go func(file FileInfo) {
-			p.FileProcessor.Process(file, provider)
+			p.FileProcessor.Process(file, p.Target, provider)
 			resultChannel <- true
 		}(file)
 	}

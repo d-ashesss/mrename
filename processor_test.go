@@ -6,7 +6,9 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -49,6 +51,10 @@ func (m MapFileProvider) Open(info FileInfo) (io.Reader, error) {
 	return bytes.NewBufferString(content), nil
 }
 
+func (m MapFileProvider) MkDir(_ string) error {
+	return nil
+}
+
 func (m MapFileProvider) Rename(info FileInfo, dstName string) error {
 	content := m[info.Name()]
 	delete(m, info.Name())
@@ -70,6 +76,10 @@ func (v VolumeFileProvider) Open(_ FileInfo) (io.Reader, error) {
 	panic("method not available")
 }
 
+func (v VolumeFileProvider) MkDir(_ string) error {
+	return nil
+}
+
 func (v VolumeFileProvider) Rename(_ FileInfo, _ string) error {
 	panic("method not available")
 }
@@ -78,6 +88,7 @@ type ErrorFileProvider struct {
 	Files       MapFileProvider
 	GetError    error
 	OpenError   error
+	MkDirError  error
 	RenameError error
 }
 
@@ -95,6 +106,10 @@ func (e ErrorFileProvider) Open(info FileInfo) (io.Reader, error) {
 	return nil, e.OpenError
 }
 
+func (e ErrorFileProvider) MkDir(_ string) error {
+	return e.MkDirError
+}
+
 func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
 	if e.RenameError == nil {
 		return e.Files.Rename(info, dstName)
@@ -104,15 +119,18 @@ func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
 
 type TrackingProcessor struct {
 	processed map[string]string
+	m sync.Mutex
 }
 
-func (t *TrackingProcessor) Process(info FileInfo, _ FileProvider) {
-	t.processed[ info.Name() ] = info.Name()
+func (t *TrackingProcessor) Process(info FileInfo, targetDir string, _ FileProvider) {
+	t.m.Lock()
+	defer t.m.Unlock()
+	t.processed[ info.Name() ] = filepath.Join(targetDir, info.Name())
 }
 
 type TimedProcessor time.Duration
 
-func (p TimedProcessor) Process(_ FileInfo, _ FileProvider) {
+func (p TimedProcessor) Process(_ FileInfo, _ string, _ FileProvider) {
 	time.Sleep(time.Duration(p))
 }
 
@@ -150,7 +168,7 @@ func setUpFileProcessorTest() processorTest {
 func TestFileProcessor_Process(t *testing.T) {
 	test := setUpFileProcessorTest()
 	fileInfo := MemoryFile{name: "1st.txt"}
-	test.Processor.Process(fileInfo, test.FileProvider)
+	test.Processor.Process(fileInfo, "", test.FileProvider)
 
 	expectedProgress := MemoryProgress{
 		"1st.txt": "first.txt",
@@ -169,10 +187,20 @@ func TestFileProcessor_Process(t *testing.T) {
 		t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
 	}
 
+	t.Run("target dir", func(t *testing.T) {
+		test := setUpFileProcessorTest()
+		fileInfo := MemoryFile{name: "1st.txt"}
+		test.Processor.Process(fileInfo, "target", test.FileProvider)
+
+		if _, ok := test.FileProvider["target/first.txt"]; !ok {
+			t.Error("File was not moved into target directory")
+		}
+	})
+
 	t.Run("no file extension", func(t *testing.T) {
 		processorTest := setUpFileProcessorTest()
 		fileInfo := MemoryFile{name: "3rd"}
-		processorTest.Processor.Process(fileInfo, processorTest.FileProvider)
+		processorTest.Processor.Process(fileInfo, "", processorTest.FileProvider)
 
 		expectedProgress := MemoryProgress{
 			"3rd": "third",
@@ -186,7 +214,7 @@ func TestFileProcessor_Process(t *testing.T) {
 		test := setUpFileProcessorTest()
 		test.Processor.DryRun = true
 		fileInfo := MemoryFile{name: "1st.txt"}
-		test.Processor.Process(fileInfo, test.FileProvider)
+		test.Processor.Process(fileInfo, "", test.FileProvider)
 
 		expectedProgress := MemoryProgress{
 			"1st.txt": "first.txt",
@@ -211,7 +239,7 @@ func TestFileProcessor_Process(t *testing.T) {
 		fileInfo := MemoryFile{name: "1st.txt"}
 		testError := errors.New("test file can't be opened")
 		fileProvider := ErrorFileProvider{OpenError: testError}
-		test.Processor.Process(fileInfo, fileProvider)
+		test.Processor.Process(fileInfo, "", fileProvider)
 
 		expectedProgress := MemoryProgress{}
 		if !reflect.DeepEqual(expectedProgress, test.Progress) {
@@ -228,7 +256,7 @@ func TestFileProcessor_Process(t *testing.T) {
 		fileInfo := MemoryFile{name: "1st.txt"}
 		testError := errors.New("test file can't be renamed")
 		fileProvider := ErrorFileProvider{Files: MapFileProvider{"1st.txt": "first"}, RenameError: testError}
-		test.Processor.Process(fileInfo, fileProvider)
+		test.Processor.Process(fileInfo, "", fileProvider)
 
 		expectedProgress := MemoryProgress{}
 		if !reflect.DeepEqual(expectedProgress, test.Progress) {
@@ -242,7 +270,7 @@ func TestFileProcessor_Process(t *testing.T) {
 }
 
 func TestBulkProcessor_Process(t *testing.T) {
-	fileProcessor := TrackingProcessor{map[string]string{}}
+	fileProcessor := TrackingProcessor{processed: map[string]string{}}
 	processor := BulkProcessor{FileProcessor: &fileProcessor}
 
 	fileProvider := ErrorFileProvider{
@@ -252,15 +280,68 @@ func TestBulkProcessor_Process(t *testing.T) {
 			"3rd":     "third",
 		},
 	}
-	_ = processor.Process(fileProvider)
+	err := processor.Process(fileProvider)
+	if err != nil {
+		t.Errorf("Expected no error, got %#v", err)
+	}
 
 	expectedProcessed := map[string]string{"1st.txt": "1st.txt", "2nd.txt": "2nd.txt", "3rd": "3rd"}
 	if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
 		t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
 	}
 
+	t.Run("target dir", func(t *testing.T) {
+		fileProcessor := TrackingProcessor{processed: map[string]string{}}
+		processor := BulkProcessor{FileProcessor: &fileProcessor, Target: "target"}
+
+		fileProvider := ErrorFileProvider{
+			Files: MapFileProvider{
+				"1st.txt": "first",
+				"2nd.txt": "second",
+				"3rd":     "third",
+			},
+		}
+		err := processor.Process(fileProvider)
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+
+		expectedProcessed := map[string]string{"1st.txt": "target/1st.txt", "2nd.txt": "target/2nd.txt", "3rd": "target/3rd"}
+		if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
+			t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
+		}
+	})
+
+	t.Run("make dir error", func(t *testing.T) {
+		fileProcessor := TrackingProcessor{processed: map[string]string{}}
+		processor := BulkProcessor{FileProcessor: &fileProcessor, Target: "target"}
+
+		testError := errors.New("target dir can't be created")
+		fileProvider := ErrorFileProvider{
+			Files: MapFileProvider{
+				"1st.txt": "first",
+				"2nd.txt": "second",
+				"3rd":     "third",
+			},
+			MkDirError: testError,
+		}
+		err := processor.Process(fileProvider)
+
+		if err == nil {
+			t.Error("Expected error, none given")
+		}
+		if err != testError {
+			t.Errorf("Expected test error, got %#v", err)
+		}
+
+		expectedProcessed := map[string]string{}
+		if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
+			t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
+		}
+	})
+
 	t.Run("get files error", func(t *testing.T) {
-		fileProcessor := TrackingProcessor{map[string]string{}}
+		fileProcessor := TrackingProcessor{processed: map[string]string{}}
 		processor := BulkProcessor{FileProcessor: &fileProcessor}
 
 		testError := errors.New("test files can't be listed")

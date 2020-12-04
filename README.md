@@ -14,7 +14,7 @@ mrename [options]
 
 - `-n`, `--dry-run` Do not actually rename the files
 - `-v`, `--verbose` Show detailed output
-
+- `-t`, `--target` Specify the target directory
 
 ### Warning
 

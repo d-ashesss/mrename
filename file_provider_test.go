@@ -103,7 +103,39 @@ func TestDirectoryFileProvider_Open(t *testing.T) {
 	})
 }
 
-func TestDirectoryFileProvider_Move(t *testing.T) {
+func TestDirectoryFileProvider_MkDir(t *testing.T) {
+	t.Run("recursive", func(t *testing.T) {
+		fs := makeTestFs()
+		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+		err := provider.MkDir("target/sub/path")
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+		if _, err := fs.Stat("target/sub/path"); err != nil {
+			t.Error("Directory was not created")
+		}
+	})
+
+	t.Run("existing dir", func(t *testing.T) {
+		fs := makeTestFs()
+		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+		err := provider.MkDir("target")
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+	})
+
+	t.Run("empty dir name", func(t *testing.T) {
+		fs := makeTestFs()
+		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+		err := provider.MkDir("")
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+	})
+}
+
+func TestDirectoryFileProvider_Rename(t *testing.T) {
 	fs := makeTestFs()
 	provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
 	fileInfo := MemoryFile{name: "1st.txt"}
