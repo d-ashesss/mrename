@@ -7,8 +7,13 @@ Designed to bulk rename files by a pattern computed with any of supported algori
 ### Usage
 
 ```shell script
-mrename [options]
+mrename [options] converter
 ```
+
+### Arguments
+
+- `converter` Which converter or algorithm to use, to rename files, Supported converters:
+  - `md5`
 
 ### Options
 

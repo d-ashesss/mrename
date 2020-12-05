@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/spf13/afero"
 	flag "github.com/spf13/pflag"
 	"log"
@@ -9,9 +8,9 @@ import (
 )
 
 var (
-	dryRun bool
+	dryRun  bool
 	verbose bool
-	target string
+	target  string
 )
 
 func init() {
@@ -24,12 +23,19 @@ func init() {
 func main() {
 	logger := log.New(os.Stderr, "", 0)
 	progress := LoggedProgress{Logger: logger, Verbose: verbose}
-	converter := Md5Converter{}
+	var converter Converter
+	switch flag.Arg(0) {
+	case "md5":
+		converter = Md5Converter{}
+		break
+	default:
+		logger.Fatalln("Invalid converter", flag.Arg(0))
+	}
 	fileProcessor := FileProcessor{Progress: progress, Converter: converter, Logger: logger, DryRun: dryRun}
 	processor := BulkProcessor{FileProcessor: &fileProcessor, Target: target}
 	fileProvider := DirectoryFileProvider{Fs: afero.NewOsFs(), Directory: "."}
 	err := processor.Process(fileProvider)
 	if err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, err)
+		logger.Fatalln(err)
 	}
 }
