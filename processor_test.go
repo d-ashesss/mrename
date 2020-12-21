@@ -20,6 +20,10 @@ func (m MemoryProgress) AddResult(name, result string) {
 	return
 }
 
+func (m MemoryProgress) GetResults() map[string]string {
+	return m
+}
+
 type MemoryFile struct {
 	name string
 }

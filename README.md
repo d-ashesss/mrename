@@ -20,6 +20,8 @@ mrename [options] converter
 - `-n`, `--dry-run` Do not actually rename the files
 - `-v`, `--verbose` Show detailed output
 - `-t`, `--target` Specify the target directory
+- `-o`, `--output-format` Output renaming results in specified format. Supported formats:
+  - `json`
 
 ### Warning
 
