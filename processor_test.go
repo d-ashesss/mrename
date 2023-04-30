@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"path/filepath"
 	"reflect"
@@ -36,8 +35,16 @@ type PlainConverter struct {
 }
 
 func (p PlainConverter) Convert(reader io.Reader) (string, error) {
-	content, _ := ioutil.ReadAll(reader)
+	content, _ := io.ReadAll(reader)
 	return string(content), nil
+}
+
+type ClosingBuffer struct {
+	*bytes.Buffer
+}
+
+func (b *ClosingBuffer) Close() error {
+	return nil
 }
 
 type MapFileProvider map[string]string
@@ -50,9 +57,9 @@ func (m MapFileProvider) GetFiles() ([]FileInfo, error) {
 	return files, nil
 }
 
-func (m MapFileProvider) Open(info FileInfo) (io.Reader, error) {
+func (m MapFileProvider) Open(info FileInfo) (io.ReadCloser, error) {
 	content := m[info.Name()]
-	return bytes.NewBufferString(content), nil
+	return &ClosingBuffer{bytes.NewBufferString(content)}, nil
 }
 
 func (m MapFileProvider) MkDir(_ string) error {
@@ -76,7 +83,7 @@ func (v VolumeFileProvider) GetFiles() ([]FileInfo, error) {
 	return files, nil
 }
 
-func (v VolumeFileProvider) Open(_ FileInfo) (io.Reader, error) {
+func (v VolumeFileProvider) Open(_ FileInfo) (io.ReadCloser, error) {
 	panic("method not available")
 }
 
@@ -103,7 +110,7 @@ func (e ErrorFileProvider) GetFiles() ([]FileInfo, error) {
 	return nil, e.GetError
 }
 
-func (e ErrorFileProvider) Open(info FileInfo) (io.Reader, error) {
+func (e ErrorFileProvider) Open(info FileInfo) (io.ReadCloser, error) {
 	if e.OpenError == nil {
 		return e.Files.Open(info)
 	}
@@ -123,13 +130,13 @@ func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
 
 type TrackingProcessor struct {
 	processed map[string]string
-	m sync.Mutex
+	m         sync.Mutex
 }
 
 func (t *TrackingProcessor) Process(info FileInfo, targetDir string, _ FileProvider) {
 	t.m.Lock()
 	defer t.m.Unlock()
-	t.processed[ info.Name() ] = filepath.Join(targetDir, info.Name())
+	t.processed[info.Name()] = filepath.Join(targetDir, info.Name())
 }
 
 type TimedProcessor time.Duration
@@ -139,11 +146,11 @@ func (p TimedProcessor) Process(_ FileInfo, _ string, _ FileProvider) {
 }
 
 type processorTest struct {
-	Progress ProgressAggregator
-	Converter Converter
-	LogBuffer *bytes.Buffer
-	Logger *log.Logger
-	Processor *FileProcessor
+	Progress     ProgressAggregator
+	Converter    Converter
+	LogBuffer    *bytes.Buffer
+	Logger       *log.Logger
+	Processor    *FileProcessor
 	FileProvider MapFileProvider
 }
 

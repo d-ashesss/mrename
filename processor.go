@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"path/filepath"
 )
@@ -23,6 +24,9 @@ func (f *FileProcessor) Process(info FileInfo, targetDir string, provider FilePr
 		f.Logger.Printf("%v: %v", info.Name(), err)
 		return
 	}
+	defer func(file io.ReadCloser) {
+		_ = file.Close()
+	}(file)
 	newName, _ := f.Converter.Convert(file)
 	if ext := filepath.Ext(info.Name()); ext != "" {
 		newName += ext
