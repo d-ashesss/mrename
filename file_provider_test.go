@@ -2,27 +2,24 @@ package main
 
 import (
 	"github.com/spf13/afero"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"testing"
 )
 
-func makeTestFs() afero.Fs {
-	baseFS := afero.NewBasePathFs(afero.NewOsFs(), "test_fs")
+func makeTestFs(t *testing.T) afero.Fs {
+	t.Helper()
 	fs := afero.NewMemMapFs()
-	_ = afero.Walk(baseFS, "", func(path string, info os.FileInfo, _ error) error {
-		if info.IsDir() {
-			_ = fs.Mkdir(path, info.Mode())
-		} else {
-			file, err := baseFS.Open(path)
-			if err == nil {
-				_ = afero.WriteReader(fs, path, file)
-				_ = file.Close()
-			}
-		}
-		return nil
-	})
+	if err := fs.Mkdir("source", 0777); err != nil {
+		t.Fatalf("Failed to create test dir: %s", err)
+	}
+	if err := afero.WriteFile(fs, "source/1st.txt", []byte("first"), 0666); err != nil {
+		t.Fatalf("Failed to create test file: %s", err)
+	}
+	if err := afero.WriteFile(fs, "source/2nd.txt", []byte("second"), 0666); err != nil {
+		t.Fatalf("Failed to create test file: %s", err)
+	}
 	return fs
 }
 
@@ -36,8 +33,8 @@ func getFileNames(files []FileInfo) []string {
 
 func TestDirectoryFileProvider_GetFiles(t *testing.T) {
 	t.Run("DirectoryTarget", func(t *testing.T) {
-		fs := makeTestFs()
-		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
 		providedFiles, _ := provider.GetFiles()
 
 		expected := []string{"1st.txt", "2nd.txt"}
@@ -49,8 +46,8 @@ func TestDirectoryFileProvider_GetFiles(t *testing.T) {
 	})
 
 	t.Run("FileTarget", func(t *testing.T) {
-		fs := makeTestFs()
-		provider := DirectoryFileProvider{Fs: fs, Directory: "target/1st.txt"}
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source/1st.txt"}
 		providedFiles, err := provider.GetFiles()
 		if err == nil {
 			t.Error("Expected an error")
@@ -78,23 +75,27 @@ func TestDirectoryFileProvider_GetFiles(t *testing.T) {
 }
 
 func TestDirectoryFileProvider_Open(t *testing.T) {
-	fs := makeTestFs()
-	provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
-	fileInfo := MemoryFile{name: "1st.txt"}
-	file, err := provider.Open(fileInfo)
-	if err != nil {
-		t.Errorf("Expected no error, got %#v", err)
-	}
-	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		t.Errorf("Expected no reading error, got %#v", err)
-	}
-	expected := "first"
-	if expected != string(content) {
-		t.Errorf("Expected content %v, got %v", expected, content)
-	}
+	t.Run("file exists", func(t *testing.T) {
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
+		fileInfo := MemoryFile{name: "1st.txt"}
+		file, err := provider.Open(fileInfo)
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+		content, err := io.ReadAll(file)
+		if err != nil {
+			t.Errorf("Expected no reading error, got %#v", err)
+		}
+		expected := "first"
+		if expected != string(content) {
+			t.Errorf("Expected content %v, got %v", expected, content)
+		}
+	})
 
 	t.Run("file does not exist", func(t *testing.T) {
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
 		fileInfo := MemoryFile{name: "0th.txt"}
 		_, err := provider.Open(fileInfo)
 		if err == nil {
@@ -105,8 +106,8 @@ func TestDirectoryFileProvider_Open(t *testing.T) {
 
 func TestDirectoryFileProvider_MkDir(t *testing.T) {
 	t.Run("recursive", func(t *testing.T) {
-		fs := makeTestFs()
-		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
 		err := provider.MkDir("target/sub/path")
 		if err != nil {
 			t.Errorf("Expected no error, got %#v", err)
@@ -117,17 +118,17 @@ func TestDirectoryFileProvider_MkDir(t *testing.T) {
 	})
 
 	t.Run("existing dir", func(t *testing.T) {
-		fs := makeTestFs()
-		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
-		err := provider.MkDir("target")
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
+		err := provider.MkDir("source")
 		if err != nil {
 			t.Errorf("Expected no error, got %#v", err)
 		}
 	})
 
 	t.Run("empty dir name", func(t *testing.T) {
-		fs := makeTestFs()
-		provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
 		err := provider.MkDir("")
 		if err != nil {
 			t.Errorf("Expected no error, got %#v", err)
@@ -136,21 +137,25 @@ func TestDirectoryFileProvider_MkDir(t *testing.T) {
 }
 
 func TestDirectoryFileProvider_Rename(t *testing.T) {
-	fs := makeTestFs()
-	provider := DirectoryFileProvider{Fs: fs, Directory: "target"}
-	fileInfo := MemoryFile{name: "1st.txt"}
-	err := provider.Rename(fileInfo, "the1st.txt")
-	if err != nil {
-		t.Errorf("Expected no error, got %#v", err)
-	}
-	if _, err := fs.Stat("target/1st.txt"); err == nil {
-		t.Error("Original file still exists")
-	}
-	if _, err := fs.Stat("target/the1st.txt"); err != nil {
-		t.Error("New file does not exist")
-	}
+	t.Run("file exists", func(t *testing.T) {
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
+		fileInfo := MemoryFile{name: "1st.txt"}
+		err := provider.Rename(fileInfo, "the1st.txt")
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+		if _, err := fs.Stat("source/1st.txt"); err == nil {
+			t.Error("Original file still exists")
+		}
+		if _, err := fs.Stat("source/the1st.txt"); err != nil {
+			t.Error("New file does not exist")
+		}
+	})
 
 	t.Run("file does not exist", func(t *testing.T) {
+		fs := makeTestFs(t)
+		provider := DirectoryFileProvider{Fs: fs, Directory: "source"}
 		fileInfo := MemoryFile{name: "0th.txt"}
 		err := provider.Rename(fileInfo, "the0th.txt")
 		if err == nil {
