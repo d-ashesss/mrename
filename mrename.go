@@ -20,7 +20,7 @@ func init() {
 	flag.BoolVarP(&dryRun, "dry-run", "n", false, "Do not actually rename files")
 	flag.BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	flag.StringVarP(&target, "target", "t", "", "Specify the target directory")
-	flag.StringVarP(&outputFormat, "output-format", "o", "", "Specify the target directory")
+	flag.StringVarP(&outputFormat, "output-format", "o", "", "Output renaming results in specified format")
 	flag.Parse()
 }
 
