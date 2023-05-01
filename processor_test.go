@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"errors"
+	"github.com/d-ashesss/mrename/file"
 	"github.com/d-ashesss/mrename/mocks"
 	"io"
 	"log"
-	"path/filepath"
+	"path"
 	"reflect"
 	"sync"
 	"testing"
@@ -24,12 +25,14 @@ func (m MemoryProgress) GetResults() map[string]string {
 	return m
 }
 
-type MemoryFile struct {
-	name string
+type StringInfo string
+
+func (f StringInfo) Name() string {
+	return path.Base(string(f))
 }
 
-func (m MemoryFile) Name() string {
-	return m.name
+func (f StringInfo) Path() string {
+	return string(f)
 }
 
 type PlainConverter struct {
@@ -50,20 +53,20 @@ func (b *ClosingBuffer) Close() error {
 
 type MapFileProvider map[string]string
 
-func (m MapFileProvider) GetFiles() ([]FileInfo, error) {
-	files := make([]FileInfo, 0, len(m))
+func (m MapFileProvider) GetFiles() ([]file.Info, error) {
+	files := make([]file.Info, 0, len(m))
 	for name := range m {
-		files = append(files, MemoryFile{name: name})
+		files = append(files, StringInfo(name))
 	}
 	return files, nil
 }
 
-func (m MapFileProvider) Open(info FileInfo) (io.ReadCloser, error) {
+func (m MapFileProvider) Open(info file.Info) (io.ReadCloser, error) {
 	content := m[info.Name()]
 	return &ClosingBuffer{bytes.NewBufferString(content)}, nil
 }
 
-func (m MapFileProvider) Rename(info FileInfo, dstName string) error {
+func (m MapFileProvider) Rename(info file.Info, dstName string) error {
 	content := m[info.Name()]
 	delete(m, info.Name())
 	m[dstName] = content
@@ -72,48 +75,40 @@ func (m MapFileProvider) Rename(info FileInfo, dstName string) error {
 
 type VolumeFileProvider int
 
-func (v VolumeFileProvider) GetFiles() ([]FileInfo, error) {
-	files := make([]FileInfo, 0, v)
+func (v VolumeFileProvider) GetFiles() ([]file.Info, error) {
+	files := make([]file.Info, 0, v)
 	for i := 0; i < int(v); i++ {
-		files = append(files, MemoryFile{name: "test"})
+		files = append(files, StringInfo("test"))
 	}
 	return files, nil
 }
 
-func (v VolumeFileProvider) Open(_ FileInfo) (io.ReadCloser, error) {
+func (v VolumeFileProvider) Open(_ file.Info) (io.ReadCloser, error) {
 	panic("method not available")
 }
 
-func (v VolumeFileProvider) Rename(_ FileInfo, _ string) error {
+func (v VolumeFileProvider) Rename(_ file.Info, _ string) error {
 	panic("method not available")
 }
 
 type ErrorFileProvider struct {
-	Files       MapFileProvider
-	GetError    error
-	OpenError   error
-	RenameError error
+	Files     MapFileProvider
+	GetError  error
+	OpenError error
 }
 
-func (e ErrorFileProvider) GetFiles() ([]FileInfo, error) {
+func (e ErrorFileProvider) GetFiles() ([]file.Info, error) {
 	if e.GetError == nil {
 		return e.Files.GetFiles()
 	}
 	return nil, e.GetError
 }
 
-func (e ErrorFileProvider) Open(info FileInfo) (io.ReadCloser, error) {
+func (e ErrorFileProvider) Open(info file.Info) (io.ReadCloser, error) {
 	if e.OpenError == nil {
 		return e.Files.Open(info)
 	}
 	return nil, e.OpenError
-}
-
-func (e ErrorFileProvider) Rename(info FileInfo, dstName string) error {
-	if e.RenameError == nil {
-		return e.Files.Rename(info, dstName)
-	}
-	return e.RenameError
 }
 
 type TrackingProcessor struct {
@@ -121,15 +116,15 @@ type TrackingProcessor struct {
 	m         sync.Mutex
 }
 
-func (t *TrackingProcessor) Process(info FileInfo, targetDir string, _ FileProvider, _ Target) {
+func (t *TrackingProcessor) Process(info file.Info, _ Source, _ Target) {
 	t.m.Lock()
 	defer t.m.Unlock()
-	t.processed[info.Name()] = filepath.Join(targetDir, info.Name())
+	t.processed[info.Name()] = info.Path()
 }
 
 type TimedProcessor time.Duration
 
-func (p TimedProcessor) Process(_ FileInfo, _ string, _ FileProvider, _ Target) {
+func (p TimedProcessor) Process(_ file.Info, _ Source, _ Target) {
 	time.Sleep(time.Duration(p))
 }
 
@@ -165,59 +160,46 @@ func setUpFileProcessorTest() processorTest {
 }
 
 func TestFileProcessor_Process(t *testing.T) {
-	test := setUpFileProcessorTest()
-	fileInfo := MemoryFile{name: "1st.txt"}
-	target := mocks.NewTarget(t)
-	test.Processor.Process(fileInfo, "", test.FileProvider, target)
-
-	expectedProgress := MemoryProgress{
-		"1st.txt": "first.txt",
-	}
-	if !reflect.DeepEqual(expectedProgress, test.Progress) {
-		t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
-	}
-	if _, ok := test.FileProvider["1st.txt"]; ok {
-		t.Error("Original file was not removed")
-	}
-	if _, ok := test.FileProvider["first.txt"]; !ok {
-		t.Error("File was not renamed")
-	}
-	expectedLog := ""
-	if expectedLog != test.LogBuffer.String() {
-		t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
-	}
-
-	t.Run("target dir", func(t *testing.T) {
+	t.Run("file", func(t *testing.T) {
 		test := setUpFileProcessorTest()
-		fileInfo := MemoryFile{name: "1st.txt"}
+		fileInfo := StringInfo("1st.txt")
 		target := mocks.NewTarget(t)
-		test.Processor.Process(fileInfo, "target", test.FileProvider, target)
+		target.On("Rename", fileInfo, "first.txt").Return(nil)
+		test.Processor.Process(fileInfo, test.FileProvider, target)
 
-		if _, ok := test.FileProvider["target/first.txt"]; !ok {
-			t.Error("File was not moved into target directory")
+		expectedProgress := MemoryProgress{
+			"1st.txt": "first.txt",
+		}
+		if !reflect.DeepEqual(expectedProgress, test.Progress) {
+			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
+		}
+		expectedLog := ""
+		if expectedLog != test.LogBuffer.String() {
+			t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
 		}
 	})
 
 	t.Run("no file extension", func(t *testing.T) {
-		processorTest := setUpFileProcessorTest()
-		fileInfo := MemoryFile{name: "3rd"}
+		test := setUpFileProcessorTest()
+		fileInfo := StringInfo("3rd")
 		target := mocks.NewTarget(t)
-		processorTest.Processor.Process(fileInfo, "", processorTest.FileProvider, target)
+		target.On("Rename", fileInfo, "third").Return(nil)
+		test.Processor.Process(fileInfo, test.FileProvider, target)
 
 		expectedProgress := MemoryProgress{
 			"3rd": "third",
 		}
-		if !reflect.DeepEqual(expectedProgress, processorTest.Progress) {
-			t.Errorf("Expected progress %v, got %v", expectedProgress, processorTest.Progress)
+		if !reflect.DeepEqual(expectedProgress, test.Progress) {
+			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
 		}
 	})
 
 	t.Run("dry run", func(t *testing.T) {
 		test := setUpFileProcessorTest()
 		test.Processor.DryRun = true
-		fileInfo := MemoryFile{name: "1st.txt"}
+		fileInfo := StringInfo("1st.txt")
 		target := mocks.NewTarget(t)
-		test.Processor.Process(fileInfo, "", test.FileProvider, target)
+		test.Processor.Process(fileInfo, test.FileProvider, target)
 
 		expectedProgress := MemoryProgress{
 			"1st.txt": "first.txt",
@@ -239,11 +221,11 @@ func TestFileProcessor_Process(t *testing.T) {
 
 	t.Run("file open error", func(t *testing.T) {
 		test := setUpFileProcessorTest()
-		fileInfo := MemoryFile{name: "1st.txt"}
+		fileInfo := StringInfo("1st.txt")
 		testError := errors.New("test file can't be opened")
 		fileProvider := ErrorFileProvider{OpenError: testError}
 		target := mocks.NewTarget(t)
-		test.Processor.Process(fileInfo, "", fileProvider, target)
+		test.Processor.Process(fileInfo, fileProvider, target)
 
 		expectedProgress := MemoryProgress{}
 		if !reflect.DeepEqual(expectedProgress, test.Progress) {
@@ -257,11 +239,11 @@ func TestFileProcessor_Process(t *testing.T) {
 
 	t.Run("file rename error", func(t *testing.T) {
 		test := setUpFileProcessorTest()
-		fileInfo := MemoryFile{name: "1st.txt"}
+		fileInfo := StringInfo("1st.txt")
 		testError := errors.New("test file can't be renamed")
-		fileProvider := ErrorFileProvider{Files: MapFileProvider{"1st.txt": "first"}, RenameError: testError}
 		target := mocks.NewTarget(t)
-		test.Processor.Process(fileInfo, "", fileProvider, target)
+		target.On("Rename", fileInfo, "first.txt").Return(testError)
+		test.Processor.Process(fileInfo, test.FileProvider, target)
 
 		expectedProgress := MemoryProgress{}
 		if !reflect.DeepEqual(expectedProgress, test.Progress) {
@@ -275,37 +257,14 @@ func TestFileProcessor_Process(t *testing.T) {
 }
 
 func TestBulkProcessor_Process(t *testing.T) {
-	fileProcessor := TrackingProcessor{processed: map[string]string{}}
-	processor := BulkProcessor{FileProcessor: &fileProcessor}
+	t.Run("files", func(t *testing.T) {
+		fileProcessor := TrackingProcessor{processed: map[string]string{}}
+		processor := BulkProcessor{FileProcessor: &fileProcessor}
 
-	fileProvider := ErrorFileProvider{
-		Files: MapFileProvider{
+		fileProvider := MapFileProvider{
 			"1st.txt": "first",
 			"2nd.txt": "second",
 			"3rd":     "third",
-		},
-	}
-	target := mocks.NewTarget(t)
-	err := processor.Process(fileProvider, target)
-	if err != nil {
-		t.Errorf("Expected no error, got %#v", err)
-	}
-
-	expectedProcessed := map[string]string{"1st.txt": "1st.txt", "2nd.txt": "2nd.txt", "3rd": "3rd"}
-	if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
-		t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
-	}
-
-	t.Run("target dir", func(t *testing.T) {
-		fileProcessor := TrackingProcessor{processed: map[string]string{}}
-		processor := BulkProcessor{FileProcessor: &fileProcessor, Target: "target"}
-
-		fileProvider := ErrorFileProvider{
-			Files: MapFileProvider{
-				"1st.txt": "first",
-				"2nd.txt": "second",
-				"3rd":     "third",
-			},
 		}
 		target := mocks.NewTarget(t)
 		err := processor.Process(fileProvider, target)
@@ -313,7 +272,7 @@ func TestBulkProcessor_Process(t *testing.T) {
 			t.Errorf("Expected no error, got %#v", err)
 		}
 
-		expectedProcessed := map[string]string{"1st.txt": "target/1st.txt", "2nd.txt": "target/2nd.txt", "3rd": "target/3rd"}
+		expectedProcessed := map[string]string{"1st.txt": "1st.txt", "2nd.txt": "2nd.txt", "3rd": "3rd"}
 		if !reflect.DeepEqual(expectedProcessed, fileProcessor.processed) {
 			t.Errorf("Expected progress %v, got %v", expectedProcessed, fileProcessor.processed)
 		}

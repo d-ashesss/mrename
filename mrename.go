@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/d-ashesss/mrename/file"
-	"github.com/spf13/afero"
 	flag "github.com/spf13/pflag"
 	"log"
 	"os"
@@ -13,14 +12,14 @@ import (
 var (
 	dryRun       bool
 	verbose      bool
-	target       string
+	targetDir    string
 	outputFormat string
 )
 
 func init() {
 	flag.BoolVarP(&dryRun, "dry-run", "n", false, "Do not actually rename files")
 	flag.BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
-	flag.StringVarP(&target, "target", "t", "", "Specify the target directory")
+	flag.StringVarP(&targetDir, "target", "t", "", "Specify the target directory")
 	flag.StringVarP(&outputFormat, "output-format", "o", "", "Output renaming results in specified format")
 	flag.Parse()
 }
@@ -37,14 +36,14 @@ func main() {
 		logger.Fatalln("Invalid converter", flag.Arg(0))
 	}
 	fileProcessor := FileProcessor{Progress: progress, Converter: converter, Logger: logger, DryRun: dryRun}
-	processor := BulkProcessor{FileProcessor: &fileProcessor, Target: target}
-	fileProvider := DirectoryFileProvider{Fs: afero.NewOsFs(), Directory: "."}
-	target, err := file.CreateTarget(target)
+	processor := BulkProcessor{FileProcessor: &fileProcessor}
+	source := file.NewSource(".")
+	target, err := file.CreateTarget(targetDir)
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	if err := processor.Process(fileProvider, target); err != nil {
+	if err := processor.Process(source, target); err != nil {
 		logger.Fatalln(err)
 	}
 	output, err := formatOutput(progress)

@@ -7,12 +7,17 @@ import (
 	"path/filepath"
 )
 
+type Source interface {
+	GetFiles() ([]file.Info, error)
+	Open(i file.Info) (io.ReadCloser, error)
+}
+
 type Target interface {
 	Rename(info file.Info, newName string) error
 }
 
 type Processor interface {
-	Process(info FileInfo, targetDir string, provider FileProvider, target Target)
+	Process(info file.Info, provider Source, target Target)
 }
 
 type FileProcessor struct {
@@ -22,23 +27,22 @@ type FileProcessor struct {
 	DryRun    bool
 }
 
-func (f *FileProcessor) Process(info FileInfo, targetDir string, provider FileProvider, target Target) {
+func (f *FileProcessor) Process(info file.Info, source Source, target Target) {
 	var err error
-	file, err := provider.Open(info)
+	reader, err := source.Open(info)
 	if err != nil {
 		f.Logger.Printf("%v: %v", info.Name(), err)
 		return
 	}
 	defer func(file io.ReadCloser) {
 		_ = file.Close()
-	}(file)
-	newName, _ := f.Converter.Convert(file)
+	}(reader)
+	newName, _ := f.Converter.Convert(reader)
 	if ext := filepath.Ext(info.Name()); ext != "" {
 		newName += ext
 	}
-	newPath := filepath.Join(targetDir, newName)
 	if !f.DryRun {
-		err = provider.Rename(info, newPath)
+		err = target.Rename(info, newName)
 	}
 	if err != nil {
 		f.Logger.Printf("%v: %v", info.Name(), err)
@@ -49,21 +53,20 @@ func (f *FileProcessor) Process(info FileInfo, targetDir string, provider FilePr
 
 type BulkProcessor struct {
 	FileProcessor Processor
-	Target        string
 }
 
-func (p *BulkProcessor) Process(provider FileProvider, target Target) error {
-	files, err := provider.GetFiles()
+func (p *BulkProcessor) Process(source Source, target Target) error {
+	files, err := source.GetFiles()
 	if err != nil {
 		return err
 	}
 
 	resultChannel := make(chan bool)
-	for _, file := range files {
-		go func(file FileInfo) {
-			p.FileProcessor.Process(file, p.Target, provider, target)
+	for _, f := range files {
+		go func(file file.Info) {
+			p.FileProcessor.Process(file, source, target)
 			resultChannel <- true
-		}(file)
+		}(f)
 	}
 	for i := 0; i < len(files); i++ {
 		<-resultChannel
