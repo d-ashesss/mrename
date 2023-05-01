@@ -1,13 +1,18 @@
 package main
 
 import (
+	"github.com/d-ashesss/mrename/file"
 	"io"
 	"log"
 	"path/filepath"
 )
 
+type Target interface {
+	Rename(info file.Info, newName string) error
+}
+
 type Processor interface {
-	Process(info FileInfo, targetDir string, provider FileProvider)
+	Process(info FileInfo, targetDir string, provider FileProvider, target Target)
 }
 
 type FileProcessor struct {
@@ -17,7 +22,7 @@ type FileProcessor struct {
 	DryRun    bool
 }
 
-func (f *FileProcessor) Process(info FileInfo, targetDir string, provider FileProvider) {
+func (f *FileProcessor) Process(info FileInfo, targetDir string, provider FileProvider, target Target) {
 	var err error
 	file, err := provider.Open(info)
 	if err != nil {
@@ -47,13 +52,8 @@ type BulkProcessor struct {
 	Target        string
 }
 
-func (p *BulkProcessor) Process(provider FileProvider) error {
+func (p *BulkProcessor) Process(provider FileProvider, target Target) error {
 	files, err := provider.GetFiles()
-	if err != nil {
-		return err
-	}
-
-	err = provider.MkDir(p.Target)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (p *BulkProcessor) Process(provider FileProvider) error {
 	resultChannel := make(chan bool)
 	for _, file := range files {
 		go func(file FileInfo) {
-			p.FileProcessor.Process(file, p.Target, provider)
+			p.FileProcessor.Process(file, p.Target, provider, target)
 			resultChannel <- true
 		}(file)
 	}

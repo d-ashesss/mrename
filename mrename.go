@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/d-ashesss/mrename/file"
 	"github.com/spf13/afero"
 	flag "github.com/spf13/pflag"
 	"log"
@@ -38,8 +39,12 @@ func main() {
 	fileProcessor := FileProcessor{Progress: progress, Converter: converter, Logger: logger, DryRun: dryRun}
 	processor := BulkProcessor{FileProcessor: &fileProcessor, Target: target}
 	fileProvider := DirectoryFileProvider{Fs: afero.NewOsFs(), Directory: "."}
-	err := processor.Process(fileProvider)
+	target, err := file.CreateTarget(target)
 	if err != nil {
+		logger.Fatal(err)
+	}
+
+	if err := processor.Process(fileProvider, target); err != nil {
 		logger.Fatalln(err)
 	}
 	output, err := formatOutput(progress)
