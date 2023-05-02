@@ -194,31 +194,6 @@ func TestFileProcessor_Process(t *testing.T) {
 		}
 	})
 
-	t.Run("dry run", func(t *testing.T) {
-		test := setUpFileProcessorTest()
-		test.Processor.DryRun = true
-		fileInfo := StringInfo("1st.txt")
-		target := mocks.NewTarget(t)
-		test.Processor.Process(fileInfo, test.FileProvider, target)
-
-		expectedProgress := MemoryProgress{
-			"1st.txt": "first.txt",
-		}
-		if !reflect.DeepEqual(expectedProgress, test.Progress) {
-			t.Errorf("Expected %v, got %v", expectedProgress, test.Progress)
-		}
-		if _, ok := test.FileProvider["1st.txt"]; !ok {
-			t.Error("Original file was removed")
-		}
-		if _, ok := test.FileProvider["first.txt"]; ok {
-			t.Error("File was renamed")
-		}
-		expectedLog := ""
-		if expectedLog != test.LogBuffer.String() {
-			t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
-		}
-	})
-
 	t.Run("file open error", func(t *testing.T) {
 		test := setUpFileProcessorTest()
 		fileInfo := StringInfo("1st.txt")

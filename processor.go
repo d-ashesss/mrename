@@ -24,7 +24,6 @@ type FileProcessor struct {
 	Progress  ProgressAggregator
 	Converter Converter
 	Logger    *log.Logger
-	DryRun    bool
 }
 
 func (f *FileProcessor) Process(info file.Info, source Source, target Target) {
@@ -41,9 +40,7 @@ func (f *FileProcessor) Process(info file.Info, source Source, target Target) {
 	if ext := filepath.Ext(info.Name()); ext != "" {
 		newName += ext
 	}
-	if !f.DryRun {
-		err = target.Rename(info, newName)
-	}
+	err = target.Rename(info, newName)
 	if err != nil {
 		f.Logger.Printf("%v: %v", info.Name(), err)
 		return

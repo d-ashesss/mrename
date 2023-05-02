@@ -35,12 +35,19 @@ func main() {
 	default:
 		logger.Fatalln("Invalid converter", flag.Arg(0))
 	}
-	fileProcessor := FileProcessor{Progress: progress, Converter: converter, Logger: logger, DryRun: dryRun}
+	fileProcessor := FileProcessor{Progress: progress, Converter: converter, Logger: logger}
 	processor := BulkProcessor{FileProcessor: &fileProcessor}
 	source := file.NewSource(".")
-	target, err := file.CreateTarget(targetDir)
-	if err != nil {
-		logger.Fatal(err)
+
+	var target Target
+	if dryRun {
+		target = &file.VoidTarget{}
+	} else {
+		var err error
+		target, err = file.CreateTarget(targetDir)
+		if err != nil {
+			logger.Fatal(err)
+		}
 	}
 
 	if err := processor.Process(source, target); err != nil {

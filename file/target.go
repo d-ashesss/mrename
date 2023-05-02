@@ -29,3 +29,12 @@ func (t *Target) Rename(info Info, newName string) error {
 	newPath := filepath.Join(t.Path, newName)
 	return fs.Rename(info.Path(), newPath)
 }
+
+// VoidTarget does not perform any actions on files. Suitable for DryRun mode
+type VoidTarget struct {
+}
+
+// Rename moves files into the target directory with a new name.
+func (t *VoidTarget) Rename(_ Info, _ string) error {
+	return nil
+}
