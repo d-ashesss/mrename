@@ -1,6 +1,19 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
+
+type MemoryProgress map[string]string
+
+func (m MemoryProgress) AddResult(name, result string) {
+	m[name] = result
+	return
+}
+
+func (m MemoryProgress) GetResults() map[string]string {
+	return m
+}
 
 func TestJsonOutput_Format(t *testing.T) {
 	t.Run("empty input", func(t *testing.T) {

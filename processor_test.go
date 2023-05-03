@@ -5,25 +5,14 @@ import (
 	"errors"
 	"github.com/d-ashesss/mrename/file"
 	"github.com/d-ashesss/mrename/mocks"
+	"github.com/d-ashesss/mrename/observer"
 	"io"
-	"log"
 	"path"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 )
-
-type MemoryProgress map[string]string
-
-func (m MemoryProgress) AddResult(name, result string) {
-	m[name] = result
-	return
-}
-
-func (m MemoryProgress) GetResults() map[string]string {
-	return m
-}
 
 type StringInfo string
 
@@ -129,105 +118,64 @@ func (p TimedProcessor) Process(_ file.Info, _ Source, _ Target) {
 }
 
 type processorTest struct {
-	Progress     ProgressAggregator
-	Converter    Converter
-	LogBuffer    *bytes.Buffer
-	Logger       *log.Logger
-	Processor    *FileProcessor
-	FileProvider MapFileProvider
+	Subscriber *mocks.Subscriber
+	Source     MapFileProvider
+	Target     *mocks.Target
+	Processor  *FileProcessor
 }
 
-func setUpFileProcessorTest() processorTest {
-	progress := MemoryProgress{}
+func setUpFileProcessorTest(t *testing.T) processorTest {
+	t.Helper()
+	obsrvr := observer.New()
+	subscriber := mocks.NewSubscriber(t)
+	obsrvr.AddSubscriber(subscriber)
 	converter := PlainConverter{}
-	var logBuffer bytes.Buffer
-	logger := log.New(&logBuffer, "", 0)
-	processor := FileProcessor{Progress: progress, Converter: converter, Logger: logger}
-	fileProvider := MapFileProvider{
-		"1st.txt": "first",
-		"2nd.txt": "second",
-		"3rd":     "third",
-	}
 
 	return processorTest{
-		Progress:     progress,
-		Converter:    converter,
-		LogBuffer:    &logBuffer,
-		Logger:       logger,
-		Processor:    &processor,
-		FileProvider: fileProvider,
+		Subscriber: subscriber,
+		Source: MapFileProvider{
+			"1st.txt": "first",
+			"2nd.txt": "second",
+			"3rd":     "third",
+		},
+		Target:    mocks.NewTarget(t),
+		Processor: &FileProcessor{Observer: obsrvr, Converter: converter},
 	}
 }
 
 func TestFileProcessor_Process(t *testing.T) {
 	t.Run("file", func(t *testing.T) {
-		test := setUpFileProcessorTest()
+		test := setUpFileProcessorTest(t)
 		fileInfo := StringInfo("1st.txt")
-		target := mocks.NewTarget(t)
-		target.On("Rename", fileInfo, "first.txt").Return(nil)
-		test.Processor.Process(fileInfo, test.FileProvider, target)
-
-		expectedProgress := MemoryProgress{
-			"1st.txt": "first.txt",
-		}
-		if !reflect.DeepEqual(expectedProgress, test.Progress) {
-			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
-		}
-		expectedLog := ""
-		if expectedLog != test.LogBuffer.String() {
-			t.Errorf("Expected empty log, got %v", test.LogBuffer.String())
-		}
+		test.Target.On("Rename", fileInfo, "first.txt").Return(nil)
+		test.Subscriber.On("Notify", observer.Event{Name: "file.completed", File: "1st.txt", Result: "first.txt"})
+		test.Processor.Process(fileInfo, test.Source, test.Target)
 	})
 
 	t.Run("no file extension", func(t *testing.T) {
-		test := setUpFileProcessorTest()
+		test := setUpFileProcessorTest(t)
 		fileInfo := StringInfo("3rd")
-		target := mocks.NewTarget(t)
-		target.On("Rename", fileInfo, "third").Return(nil)
-		test.Processor.Process(fileInfo, test.FileProvider, target)
-
-		expectedProgress := MemoryProgress{
-			"3rd": "third",
-		}
-		if !reflect.DeepEqual(expectedProgress, test.Progress) {
-			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
-		}
+		test.Target.On("Rename", fileInfo, "third").Return(nil)
+		test.Subscriber.On("Notify", observer.Event{Name: "file.completed", File: "3rd", Result: "third"})
+		test.Processor.Process(fileInfo, test.Source, test.Target)
 	})
 
 	t.Run("file open error", func(t *testing.T) {
-		test := setUpFileProcessorTest()
+		test := setUpFileProcessorTest(t)
 		fileInfo := StringInfo("1st.txt")
 		testError := errors.New("test file can't be opened")
 		fileProvider := ErrorFileProvider{OpenError: testError}
-		target := mocks.NewTarget(t)
-		test.Processor.Process(fileInfo, fileProvider, target)
-
-		expectedProgress := MemoryProgress{}
-		if !reflect.DeepEqual(expectedProgress, test.Progress) {
-			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
-		}
-		expectedLog := "1st.txt: test file can't be opened\n"
-		if expectedLog != test.LogBuffer.String() {
-			t.Errorf("Expected logged file open error, got %v", test.LogBuffer.String())
-		}
+		test.Subscriber.On("Notify", observer.Event{Name: "file.error", File: "1st.txt", Error: testError})
+		test.Processor.Process(fileInfo, fileProvider, test.Target)
 	})
 
 	t.Run("file rename error", func(t *testing.T) {
-		test := setUpFileProcessorTest()
+		test := setUpFileProcessorTest(t)
 		fileInfo := StringInfo("1st.txt")
 		testError := errors.New("test file can't be renamed")
-		target := mocks.NewTarget(t)
-		target.On("Rename", fileInfo, "first.txt").Return(testError)
-		test.Processor.Process(fileInfo, test.FileProvider, target)
-
-		expectedProgress := MemoryProgress{}
-		if !reflect.DeepEqual(expectedProgress, test.Progress) {
-			t.Errorf("Expected progress %v, got %v", expectedProgress, test.Progress)
-		}
-		expectedLog := "1st.txt: test file can't be renamed\n"
-		if expectedLog != test.LogBuffer.String() {
-			t.Errorf("Expected logged file rename error, got %v", test.LogBuffer.String())
-		}
+		test.Target.On("Rename", fileInfo, "first.txt").Return(testError)
+		test.Subscriber.On("Notify", observer.Event{Name: "file.error", File: "1st.txt", Error: testError})
+		test.Processor.Process(fileInfo, test.Source, test.Target)
 	})
 }
 

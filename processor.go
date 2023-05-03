@@ -2,8 +2,8 @@ package main
 
 import (
 	"github.com/d-ashesss/mrename/file"
+	"github.com/d-ashesss/mrename/observer"
 	"io"
-	"log"
 	"path/filepath"
 )
 
@@ -21,16 +21,15 @@ type Processor interface {
 }
 
 type FileProcessor struct {
-	Progress  ProgressAggregator
+	Observer  *observer.Observer
 	Converter Converter
-	Logger    *log.Logger
 }
 
 func (f *FileProcessor) Process(info file.Info, source Source, target Target) {
 	var err error
 	reader, err := source.Open(info)
 	if err != nil {
-		f.Logger.Printf("%v: %v", info.Name(), err)
+		f.Observer.PublishError("file.error", info.Name(), err)
 		return
 	}
 	defer func(file io.ReadCloser) {
@@ -42,10 +41,10 @@ func (f *FileProcessor) Process(info file.Info, source Source, target Target) {
 	}
 	err = target.Rename(info, newName)
 	if err != nil {
-		f.Logger.Printf("%v: %v", info.Name(), err)
+		f.Observer.PublishError("file.error", info.Name(), err)
 		return
 	}
-	f.Progress.AddResult(info.Name(), newName)
+	f.Observer.PublishResult("file.completed", info.Name(), newName)
 }
 
 type BulkProcessor struct {

@@ -1,48 +1,50 @@
 package main
 
 import (
-	"bytes"
-	"log"
+	"github.com/d-ashesss/mrename/observer"
 	"reflect"
+	"sync"
 	"testing"
 )
 
-func TestLoggedProgress_AddResult(t *testing.T) {
-	var buffer bytes.Buffer
-	logger := log.New(&buffer, "", 0)
-	output := NewLoggedProgress(logger, false)
-	output.AddResult("name1", "result1")
-	output.AddResult("name2", "result2")
-	expected := ""
-	got := buffer.String()
-	if expected != got {
-		t.Errorf("Expected empty log, got %v", got)
-	}
-
-	t.Run("verbose", func(t *testing.T) {
-		var buffer bytes.Buffer
-		logger := log.New(&buffer, "", 0)
-		output := NewLoggedProgress(logger, true)
-		output.AddResult("name1", "result1")
-		output.AddResult("name2", "result2")
-		expected := `name1 result1
-name2 result2
-`
-		got := buffer.String()
-		if expected != got {
-			t.Errorf("Expected %v, got %v", expected, got)
-		}
-	})
-}
-
-func TestLoggedProgress_GetResults(t *testing.T) {
-	output := NewLoggedProgress(nil, false)
-	output.AddResult("name1", "result1")
-	results := output.GetResults()
-	expectedResults := map[string]string {
+func TestProgress_AddResult(t *testing.T) {
+	progress := NewProgressAggregator()
+	progress.AddResult("name1", "result1")
+	results := progress.GetResults()
+	expectedResults := map[string]string{
 		"name1": "result1",
 	}
 	if !reflect.DeepEqual(expectedResults, results) {
 		t.Errorf("Expected results %v, got %v", expectedResults, results)
 	}
+}
+
+func TestProgress_Notify(t *testing.T) {
+	progress := NewProgressAggregator()
+	obsrvr := observer.New()
+	obsrvr.AddSubscriber(progress)
+	obsrvr.PublishResult("file.completed", "name1", "result1")
+	results := progress.GetResults()
+	expectedResults := map[string]string{
+		"name1": "result1",
+	}
+	if !reflect.DeepEqual(expectedResults, results) {
+		t.Errorf("Expected results %v, got %v", expectedResults, results)
+	}
+}
+
+func TestProgress_concurrency(t *testing.T) {
+	progress := NewProgressAggregator()
+
+	var wg sync.WaitGroup
+	wg.Add(1000)
+
+	for i := 0; i < 1000; i++ {
+		go func() {
+			progress.AddResult("name1", "result1")
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
 }

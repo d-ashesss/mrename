@@ -1,40 +1,33 @@
 package main
 
 import (
-	"log"
+	"github.com/d-ashesss/mrename/observer"
 	"sync"
 )
 
-type ProgressAggregator interface {
-	AddResult(name, result string)
-	GetResults() map[string]string
-}
-
-func NewLoggedProgress(logger *log.Logger, verbose bool) LoggedProgress {
-	return LoggedProgress{
-		Logger:  logger,
-		Verbose: verbose,
+func NewProgressAggregator() *Progress {
+	return &Progress{
 		results: make(map[string]string),
-		mutex: new(sync.Mutex),
 	}
 }
 
-type LoggedProgress struct {
-	Logger  *log.Logger
-	Verbose bool
+type Progress struct {
 	results map[string]string
-	mutex   *sync.Mutex
+	mutex   sync.Mutex
 }
 
-func (o LoggedProgress) AddResult(name, result string) {
+func (o *Progress) Notify(e observer.Event) {
+	if e.Name == "file.completed" {
+		o.AddResult(e.File, e.Result)
+	}
+}
+
+func (o *Progress) AddResult(name, result string) {
 	o.mutex.Lock()
 	o.results[name] = result
 	o.mutex.Unlock()
-	if o.Verbose {
-		o.Logger.Printf("%s %s\n", name, result)
-	}
 }
 
-func (o LoggedProgress) GetResults() map[string]string {
+func (o *Progress) GetResults() map[string]string {
 	return o.results
 }
