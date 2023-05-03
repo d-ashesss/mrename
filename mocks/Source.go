@@ -3,10 +3,7 @@
 package mocks
 
 import (
-	io "io"
-
 	file "github.com/d-ashesss/mrename/file"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -31,29 +28,6 @@ func (_m *Source) GetFiles() ([]file.Info, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func() error); ok {
 		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Open provides a mock function with given fields: i
-func (_m *Source) Open(i file.Info) (io.ReadCloser, error) {
-	ret := _m.Called(i)
-
-	var r0 io.ReadCloser
-	if rf, ok := ret.Get(0).(func(file.Info) io.ReadCloser); ok {
-		r0 = rf(i)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(io.ReadCloser)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(file.Info) error); ok {
-		r1 = rf(i)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -22,7 +22,7 @@ func TestSource_GetFiles(t *testing.T) {
 		source := file.NewSource("source")
 		files, _ := source.GetFiles()
 
-		expected := []string{"1st.txt", "2nd.txt"}
+		expected := []string{"1st.txt", "2nd.txt", "3rd"}
 		got := getFileNames(files)
 
 		if !reflect.DeepEqual(expected, got) {

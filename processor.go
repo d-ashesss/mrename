@@ -3,69 +3,53 @@ package main
 import (
 	"github.com/d-ashesss/mrename/file"
 	"github.com/d-ashesss/mrename/observer"
-	"io"
-	"path/filepath"
+	"sync"
 )
 
 type Source interface {
 	GetFiles() ([]file.Info, error)
-	Open(i file.Info) (io.ReadCloser, error)
 }
 
 type Target interface {
 	Rename(info file.Info, newName string) error
 }
 
-type Processor interface {
-	Process(info file.Info, provider Source, target Target)
+type Processor struct {
+	observer  *observer.Observer
+	converter file.Converter
 }
 
-type FileProcessor struct {
-	Observer  *observer.Observer
-	Converter Converter
-}
-
-func (f *FileProcessor) Process(info file.Info, source Source, target Target) {
-	var err error
-	reader, err := source.Open(info)
-	if err != nil {
-		f.Observer.PublishError("file.error", info.Name(), err)
-		return
+func NewProcessor(o *observer.Observer, c file.Converter) *Processor {
+	return &Processor{
+		observer:  o,
+		converter: c,
 	}
-	defer func(file io.ReadCloser) {
-		_ = file.Close()
-	}(reader)
-	newName, _ := f.Converter.Convert(reader)
-	if ext := filepath.Ext(info.Name()); ext != "" {
-		newName += ext
-	}
-	err = target.Rename(info, newName)
-	if err != nil {
-		f.Observer.PublishError("file.error", info.Name(), err)
-		return
-	}
-	f.Observer.PublishResult("file.completed", info.Name(), newName)
 }
 
-type BulkProcessor struct {
-	FileProcessor Processor
-}
-
-func (p *BulkProcessor) Process(source Source, target Target) error {
+func (p *Processor) Process(source Source, target Target) error {
 	files, err := source.GetFiles()
 	if err != nil {
 		return err
 	}
 
-	resultChannel := make(chan bool)
+	var wg sync.WaitGroup
+	wg.Add(len(files))
+
 	for _, f := range files {
 		go func(file file.Info) {
-			p.FileProcessor.Process(file, source, target)
-			resultChannel <- true
+			defer wg.Done()
+			result, err := p.converter.Convert(file)
+			if err != nil {
+				p.observer.PublishError("file.error", file.Name(), err)
+				return
+			}
+			if err := target.Rename(file, result); err != nil {
+				p.observer.PublishError("file.error", file.Name(), err)
+				return
+			}
+			p.observer.PublishResult("file.completed", file.Name(), result)
 		}(f)
 	}
-	for i := 0; i < len(files); i++ {
-		<-resultChannel
-	}
+	wg.Wait()
 	return nil
 }

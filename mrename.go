@@ -30,16 +30,16 @@ func main() {
 	obsrvr := observer.New()
 	obsrvr.AddSubscriber(progress)
 	obsrvr.AddSubscriber(Log{Verbose: verbose})
-	var converter Converter
+
+	var converter file.Converter
 	switch flag.Arg(0) {
 	case "md5":
-		converter = Md5Converter{}
+		converter = file.NewMD5Converter()
 		break
 	default:
 		log.Fatal("error: invalid converter: ", flag.Arg(0))
 	}
-	fileProcessor := FileProcessor{Observer: obsrvr, Converter: converter}
-	processor := BulkProcessor{FileProcessor: &fileProcessor}
+	processor := NewProcessor(obsrvr, converter)
 	source := file.NewSource(".")
 
 	var target Target

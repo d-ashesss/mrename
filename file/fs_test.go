@@ -18,6 +18,9 @@ func setTestFs(t *testing.T) afero.Fs {
 	if err := afero.WriteFile(fs, "source/2nd.txt", []byte("second"), 0644); err != nil {
 		t.Fatalf("Failed to create test file: %s", err)
 	}
+	if err := afero.WriteFile(fs, "source/3rd", []byte("third"), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %s", err)
+	}
 	file.SetFS(fs)
 	return fs
 }
