@@ -18,8 +18,10 @@ func CreateTarget(path string) (*Target, error) {
 	if ok, err := afero.IsDir(fs, path); !ok && err == nil {
 		return nil, ErrNotDirectory
 	}
-	if err := fs.MkdirAll(path, 0755); err != nil {
-		return nil, err
+	if path != "" {
+		if err := fs.MkdirAll(path, 0755); err != nil {
+			return nil, err
+		}
 	}
 	return &Target{Path: path}, nil
 }
