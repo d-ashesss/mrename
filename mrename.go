@@ -21,15 +21,16 @@ func init() {
 	flag.BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	flag.StringVarP(&targetDir, "target", "t", "", "Specify the target directory")
 	flag.StringVarP(&outputFormat, "output-format", "o", "", "Output renaming results in specified format")
-	flag.Parse()
 }
 
 func main() {
 	log.SetFlags(0)
+	flag.Parse()
+
 	progress := NewProgressAggregator()
 	obsrvr := observer.New()
 	obsrvr.AddSubscriber(progress)
-	obsrvr.AddSubscriber(Log{Verbose: verbose})
+	obsrvr.AddSubscriber(EventLogger{Verbose: verbose})
 
 	var converter file.Converter
 	switch flag.Arg(0) {
@@ -37,7 +38,7 @@ func main() {
 		converter = file.NewMD5Converter()
 		break
 	default:
-		log.Fatal("error: invalid converter: ", flag.Arg(0))
+		log.Fatalf("error: invalid converter: %q", flag.Arg(0))
 	}
 	processor := NewProcessor(obsrvr, converter)
 	source := file.NewSource(".")
@@ -49,16 +50,16 @@ func main() {
 		var err error
 		target, err = file.CreateTarget(targetDir)
 		if err != nil {
-			log.Fatal("error: ", err)
+			log.Fatal("error: create target: ", err)
 		}
 	}
 
 	if err := processor.Process(source, target); err != nil {
-		log.Fatal("error: ", err)
+		log.Fatal("error: process: ", err)
 	}
 	output, err := formatOutput(progress)
 	if err != nil {
-		log.Fatal("error: ", err)
+		log.Fatal("error: output: ", err)
 	}
 	if len(output) > 0 {
 		fmt.Print(output)
