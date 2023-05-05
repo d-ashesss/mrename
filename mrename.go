@@ -1,10 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"github.com/d-ashesss/mrename/file"
 	"github.com/d-ashesss/mrename/observer"
+	"github.com/d-ashesss/mrename/progress"
 	flag "github.com/spf13/pflag"
 	"log"
 )
@@ -27,9 +27,9 @@ func main() {
 	log.SetFlags(0)
 	flag.Parse()
 
-	progress := NewProgressAggregator()
+	progrss := progress.NewAggregator()
 	obsrvr := observer.New()
-	obsrvr.AddSubscriber(progress)
+	obsrvr.AddSubscriber(progrss)
 	obsrvr.AddSubscriber(EventLogger{Verbose: verbose})
 
 	var converter file.Converter
@@ -57,25 +57,10 @@ func main() {
 	if err := processor.Process(source, target); err != nil {
 		log.Fatal("error: process: ", err)
 	}
-	output, err := formatOutput(progress)
+
+	output, err := progress.Format(outputFormat, progrss)
 	if err != nil {
 		log.Fatal("error: output: ", err)
 	}
-	if len(output) > 0 {
-		fmt.Print(output)
-	}
-}
-
-func formatOutput(progress ProgressAggregator) (string, error) {
-	var output Output
-	switch outputFormat {
-	case "":
-		return "", nil
-	case "json":
-		output = JsonOutput{}
-	default:
-		return "", errors.New("test")
-	}
-	j := output.Format(progress)
-	return j, nil
+	fmt.Print(output)
 }

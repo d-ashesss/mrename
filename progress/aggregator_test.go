@@ -1,16 +1,17 @@
-package main
+package progress_test
 
 import (
 	"github.com/d-ashesss/mrename/observer"
+	"github.com/d-ashesss/mrename/progress"
 	"reflect"
 	"sync"
 	"testing"
 )
 
-func TestProgress_AddResult(t *testing.T) {
-	progress := NewProgressAggregator()
-	progress.AddResult("name1", "result1")
-	results := progress.GetResults()
+func TestAggregator_AddResult(t *testing.T) {
+	aggregator := progress.NewAggregator()
+	aggregator.AddResult("name1", "result1")
+	results := aggregator.GetResults()
 	expectedResults := map[string]string{
 		"name1": "result1",
 	}
@@ -19,12 +20,12 @@ func TestProgress_AddResult(t *testing.T) {
 	}
 }
 
-func TestProgress_Notify(t *testing.T) {
-	progress := NewProgressAggregator()
+func TestAggregator_Notify(t *testing.T) {
+	aggregator := progress.NewAggregator()
 	obsrvr := observer.New()
-	obsrvr.AddSubscriber(progress)
+	obsrvr.AddSubscriber(aggregator)
 	obsrvr.PublishResult("file.completed", "name1", "result1")
-	results := progress.GetResults()
+	results := aggregator.GetResults()
 	expectedResults := map[string]string{
 		"name1": "result1",
 	}
@@ -33,15 +34,15 @@ func TestProgress_Notify(t *testing.T) {
 	}
 }
 
-func TestProgress_concurrency(t *testing.T) {
-	progress := NewProgressAggregator()
+func TestAggregator_concurrency(t *testing.T) {
+	aggregator := progress.NewAggregator()
 
 	var wg sync.WaitGroup
 	wg.Add(1000)
 
 	for i := 0; i < 1000; i++ {
 		go func() {
-			progress.AddResult("name1", "result1")
+			aggregator.AddResult("name1", "result1")
 			wg.Done()
 		}()
 	}
