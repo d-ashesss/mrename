@@ -39,3 +39,7 @@ func (c *contentConverter) Convert(i Info) (string, error) {
 func NewMD5Converter() Converter {
 	return &contentConverter{producer: producer.MD5{}}
 }
+
+func NewSHA1Converter() Converter {
+	return &contentConverter{producer: producer.SHA1{}}
+}

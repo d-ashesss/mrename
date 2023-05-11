@@ -36,7 +36,8 @@ func main() {
 	switch flag.Arg(0) {
 	case "md5":
 		converter = file.NewMD5Converter()
-		break
+	case "sha1":
+		converter = file.NewSHA1Converter()
 	default:
 		log.Fatalf("error: invalid converter: %q", flag.Arg(0))
 	}

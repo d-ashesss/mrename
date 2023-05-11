@@ -2,6 +2,7 @@ package producer
 
 import (
 	"crypto/md5"
+	"crypto/sha1"
 	"fmt"
 	"hash"
 	"io"
@@ -18,7 +19,15 @@ func produceHash(reader io.Reader, h hash.Hash) (string, error) {
 type MD5 struct {
 }
 
-func (c MD5) Produce(reader io.Reader) (string, error) {
+func (p MD5) Produce(reader io.Reader) (string, error) {
 	h := md5.New()
+	return produceHash(reader, h)
+}
+
+type SHA1 struct {
+}
+
+func (p SHA1) Produce(reader io.Reader) (string, error) {
+	h := sha1.New()
 	return produceHash(reader, h)
 }

@@ -14,6 +14,7 @@ mrename [options] converter
 
 - `converter` Which converter or algorithm to use, to rename files, Supported converters:
   - `md5`
+  - `sha1`
 
 ### Options
 
