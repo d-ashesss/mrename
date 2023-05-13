@@ -40,6 +40,8 @@ func main() {
 		converter = file.NewSHA1Converter()
 	case "tolower":
 		converter = file.NewToLowerConverter()
+	case "jpeg2jpg":
+		converter = file.NewJpeg2JpgConverter()
 	default:
 		log.Fatalf("error: invalid converter: %q", flag.Arg(0))
 	}

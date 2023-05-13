@@ -16,6 +16,7 @@ mrename [options] converter
   - `md5`
   - `sha1`
   - `tolower`
+  - `jpeg2jpg`
 
 ### Options
 

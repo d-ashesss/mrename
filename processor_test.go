@@ -108,6 +108,33 @@ func TestProcessor_Process(t *testing.T) {
 		}
 	})
 
+	t.Run("file skipped", func(t *testing.T) {
+		obsrvr := observer.New()
+		subscriber := mocks.NewSubscriber(t)
+		subscriber.On("Notify", observer.Event{Name: "file.completed", File: "2nd.txt", Result: "snd"})
+		subscriber.On("Notify", observer.Event{Name: "file.completed", File: "3rd", Result: "trd"})
+		obsrvr.AddSubscriber(subscriber)
+		converter := mocks.NewConverter(t)
+		converter.On("Convert", StringInfo("1st.txt")).Return("fst", file.ErrFileSkipped).Once()
+		converter.On("Convert", StringInfo("2nd.txt")).Return("snd", nil).Once()
+		converter.On("Convert", StringInfo("3rd")).Return("trd", nil).Once()
+		processor := NewProcessor(obsrvr, converter)
+
+		source := mocks.NewSource(t)
+		source.On("GetFiles").Return([]file.Info{
+			StringInfo("1st.txt"),
+			StringInfo("2nd.txt"),
+			StringInfo("3rd"),
+		}, nil)
+		target := mocks.NewTarget(t)
+		target.On("Rename", StringInfo("2nd.txt"), "snd").Return(nil).Once()
+		target.On("Rename", StringInfo("3rd"), "trd").Return(nil).Once()
+		err := processor.Process(source, target)
+		if err != nil {
+			t.Errorf("Expected no error, got %#v", err)
+		}
+	})
+
 	t.Run("get files error", func(t *testing.T) {
 		processor := Processor{}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/d-ashesss/mrename/file"
 	"github.com/d-ashesss/mrename/observer"
 	"sync"
@@ -36,18 +37,21 @@ func (p *Processor) Process(source Source, target Target) error {
 	wg.Add(len(files))
 
 	for _, f := range files {
-		go func(file file.Info) {
+		go func(f file.Info) {
 			defer wg.Done()
-			result, err := p.converter.Convert(file)
+			result, err := p.converter.Convert(f)
+			if errors.Is(err, file.ErrFileSkipped) {
+				return
+			}
 			if err != nil {
-				p.observer.PublishError("file.error", file.Name(), err)
+				p.observer.PublishError("file.error", f.Name(), err)
 				return
 			}
-			if err := target.Rename(file, result); err != nil {
-				p.observer.PublishError("file.error", file.Name(), err)
+			if err := target.Rename(f, result); err != nil {
+				p.observer.PublishError("file.error", f.Name(), err)
 				return
 			}
-			p.observer.PublishResult("file.completed", file.Name(), result)
+			p.observer.PublishResult("file.completed", f.Name(), result)
 		}(f)
 	}
 	wg.Wait()

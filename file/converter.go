@@ -1,11 +1,15 @@
 package file
 
 import (
+	"errors"
 	"github.com/d-ashesss/mrename/producer"
 	"io"
+	"path"
 	"path/filepath"
 	"strings"
 )
+
+var ErrFileSkipped = errors.New("file skipped")
 
 type Converter interface {
 	Convert(Info) (string, error)
@@ -54,4 +58,20 @@ func (c *toLowerConverter) Convert(i Info) (string, error) {
 
 func NewToLowerConverter() Converter {
 	return &toLowerConverter{}
+}
+
+type jpeg2JpgConverter struct {
+}
+
+func (c *jpeg2JpgConverter) Convert(i Info) (string, error) {
+	ext := path.Ext(i.Name())
+	if ext != ".jpeg" {
+		return i.Name(), ErrFileSkipped
+	}
+	name, _ := strings.CutSuffix(i.Name(), ext)
+	return name + ".jpg", nil
+}
+
+func NewJpeg2JpgConverter() Converter {
+	return &jpeg2JpgConverter{}
 }
