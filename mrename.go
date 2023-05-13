@@ -38,6 +38,8 @@ func main() {
 		converter = file.NewMD5Converter()
 	case "sha1":
 		converter = file.NewSHA1Converter()
+	case "tolower":
+		converter = file.NewToLowerConverter()
 	default:
 		log.Fatalf("error: invalid converter: %q", flag.Arg(0))
 	}

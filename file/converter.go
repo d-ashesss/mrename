@@ -4,6 +4,7 @@ import (
 	"github.com/d-ashesss/mrename/producer"
 	"io"
 	"path/filepath"
+	"strings"
 )
 
 type Converter interface {
@@ -42,4 +43,15 @@ func NewMD5Converter() Converter {
 
 func NewSHA1Converter() Converter {
 	return &contentConverter{producer: producer.SHA1{}}
+}
+
+type toLowerConverter struct {
+}
+
+func (c *toLowerConverter) Convert(i Info) (string, error) {
+	return strings.ToLower(i.Name()), nil
+}
+
+func NewToLowerConverter() Converter {
+	return &toLowerConverter{}
 }

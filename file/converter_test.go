@@ -34,3 +34,16 @@ func TestMD5Converter(t *testing.T) {
 		}
 	})
 }
+
+func TestToLowerConverter(t *testing.T) {
+	i := StringInfo("source/1ST.TXT")
+	c := file.NewToLowerConverter()
+	got, err := c.Convert(i)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	expected := "1st.txt"
+	if expected != got {
+		t.Errorf("Expected new name %q, got %q", expected, got)
+	}
+}
