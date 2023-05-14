@@ -10,11 +10,20 @@ type Info interface {
 	Path() string
 }
 
-type info struct {
+type osInfo struct {
 	os.FileInfo
 	path string
 }
 
-func (i *info) Path() string {
+func (i *osInfo) Path() string {
 	return path.Join(i.path, i.Name())
+}
+
+type namedInfo struct {
+	Info
+	name string
+}
+
+func (i *namedInfo) Name() string {
+	return i.name
 }

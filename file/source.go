@@ -2,7 +2,6 @@ package file
 
 import (
 	"github.com/spf13/afero"
-	"io"
 )
 
 // Source represents a source directory with means to list and read files in it.
@@ -23,13 +22,9 @@ func (s *Source) GetFiles() ([]Info, error) {
 	files := make([]Info, 0, len(items))
 	for _, item := range items {
 		if !item.IsDir() {
-			i := &info{FileInfo: item, path: s.Path}
+			i := &osInfo{FileInfo: item, path: s.Path}
 			files = append(files, i)
 		}
 	}
 	return files, nil
-}
-
-func (s *Source) Open(i Info) (io.ReadCloser, error) {
-	return fs.Open(i.Path())
 }

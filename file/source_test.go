@@ -2,7 +2,6 @@ package file_test
 
 import (
 	"github.com/d-ashesss/mrename/file"
-	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -51,37 +50,6 @@ func TestSource_GetFiles(t *testing.T) {
 		}
 		if len(files) > 0 {
 			t.Errorf("Expected 0 files, got %d", len(files))
-		}
-	})
-}
-
-func TestSource_Open(t *testing.T) {
-	t.Run("file exists", func(t *testing.T) {
-		setTestFs(t)
-		source := file.NewSource("source")
-		fileInfo := StringInfo("source/1st.txt")
-		f, err := source.Open(fileInfo)
-		if err != nil {
-			t.Errorf("Expected no error, got %#v", err)
-		}
-		content, err := io.ReadAll(f)
-		_ = f.Close()
-		if err != nil {
-			t.Errorf("Expected no reading error, got %#v", err)
-		}
-		expected := "first"
-		if expected != string(content) {
-			t.Errorf("Expected content %v, got %v", expected, content)
-		}
-	})
-
-	t.Run("file does not exist", func(t *testing.T) {
-		setTestFs(t)
-		source := file.NewSource("source")
-		fileInfo := StringInfo("source/0st.txt")
-		_, err := source.Open(fileInfo)
-		if err == nil {
-			t.Error("Expected an error")
 		}
 	})
 }

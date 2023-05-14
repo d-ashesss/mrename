@@ -33,6 +33,11 @@ func (_m *Converter) Convert(_a0 file.Info) (string, error) {
 	return r0, r1
 }
 
+// SetNext provides a mock function with given fields: _a0
+func (_m *Converter) SetNext(_a0 file.Converter) {
+	_m.Called(_a0)
+}
+
 type mockConstructorTestingTNewConverter interface {
 	mock.TestingT
 	Cleanup(func())

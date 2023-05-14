@@ -33,17 +33,23 @@ func main() {
 	obsrvr.AddSubscriber(EventLogger{Verbose: verbose})
 
 	var converter file.Converter
-	switch flag.Arg(0) {
-	case "md5":
-		converter = file.NewMD5Converter()
-	case "sha1":
-		converter = file.NewSHA1Converter()
-	case "tolower":
-		converter = file.NewToLowerConverter()
-	case "jpeg2jpg":
-		converter = file.NewJpeg2JpgConverter()
-	default:
-		log.Fatalf("error: invalid converter: %q", flag.Arg(0))
+	for i := flag.NArg() - 1; i >= 0; i-- {
+		log.Print("i: ", i, " ", flag.Arg(i))
+		var c file.Converter
+		switch flag.Arg(i) {
+		case "md5":
+			c = file.NewMD5Converter()
+		case "sha1":
+			c = file.NewSHA1Converter()
+		case "tolower":
+			c = file.NewToLowerConverter()
+		case "jpeg2jpg":
+			c = file.NewJpeg2JpgConverter()
+		default:
+			log.Fatalf("error: invalid converter: %q", flag.Arg(i))
+		}
+		c.SetNext(converter)
+		converter = c
 	}
 	processor := NewProcessor(obsrvr, converter)
 	source := file.NewSource(".")
