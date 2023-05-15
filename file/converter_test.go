@@ -64,6 +64,34 @@ func TestJpeg2JpgConverter(t *testing.T) {
 		}
 	})
 
+	t.Run("Jpeg", func(t *testing.T) {
+		setTestFs(t)
+		i := StringInfo("source/1st.Jpeg")
+		c := file.NewJpeg2JpgConverter()
+		got, err := c.Convert(i)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		expected := "1st.Jpg"
+		if expected != got {
+			t.Errorf("Expected new name %q, got %q", expected, got)
+		}
+	})
+
+	t.Run("JPEG", func(t *testing.T) {
+		setTestFs(t)
+		i := StringInfo("source/1st.JPEG")
+		c := file.NewJpeg2JpgConverter()
+		got, err := c.Convert(i)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		expected := "1st.JPG"
+		if expected != got {
+			t.Errorf("Expected new name %q, got %q", expected, got)
+		}
+	})
+
 	t.Run("not jpeg", func(t *testing.T) {
 		setTestFs(t)
 		i := StringInfo("source/1st.txt")

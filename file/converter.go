@@ -5,6 +5,7 @@ import (
 	"io"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -81,11 +82,11 @@ type jpeg2JpgConverter struct {
 }
 
 func (c *jpeg2JpgConverter) Convert(i Info) (string, error) {
-	ext := path.Ext(i.Name())
 	newName := i.Name()
-	if ext == ".jpeg" {
+	if regexp.MustCompile(`(?i)\.jpeg$`).MatchString(newName) {
+		ext := path.Ext(i.Name())
 		newName, _ = strings.CutSuffix(i.Name(), ext)
-		newName += ".jpg"
+		newName += regexp.MustCompile(`(?i)e`).ReplaceAllString(ext, "")
 	}
 	return c.convertNext(i, newName)
 }

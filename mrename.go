@@ -34,7 +34,6 @@ func main() {
 
 	var converter file.Converter
 	for i := flag.NArg() - 1; i >= 0; i-- {
-		log.Print("i: ", i, " ", flag.Arg(i))
 		var c file.Converter
 		switch flag.Arg(i) {
 		case "md5":
