@@ -20,6 +20,7 @@ mrename [options] converter
 
 ### Options
 
+- `-c`, `--copy` Copy files instead of renaming them
 - `-n`, `--dry-run` Do not actually rename the files
 - `-v`, `--verbose` Show detailed output
 - `-t`, `--target` Specify the target directory

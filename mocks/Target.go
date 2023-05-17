@@ -13,7 +13,7 @@ type Target struct {
 }
 
 // Rename provides a mock function with given fields: info, newName
-func (_m *Target) Rename(info file.Info, newName string) error {
+func (_m *Target) Acquire(info file.Info, newName string) error {
 	ret := _m.Called(info, newName)
 
 	var r0 error

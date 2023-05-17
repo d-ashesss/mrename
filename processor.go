@@ -6,14 +6,6 @@ import (
 	"sync"
 )
 
-type Source interface {
-	GetFiles() ([]file.Info, error)
-}
-
-type Target interface {
-	Rename(info file.Info, newName string) error
-}
-
 type Processor struct {
 	observer  *observer.Observer
 	converter file.Converter
@@ -26,7 +18,7 @@ func NewProcessor(o *observer.Observer, c file.Converter) *Processor {
 	}
 }
 
-func (p *Processor) Process(source Source, target Target) error {
+func (p *Processor) Process(source file.Source, target file.Target) error {
 	files, err := source.GetFiles()
 	if err != nil {
 		return err
@@ -43,7 +35,7 @@ func (p *Processor) Process(source Source, target Target) error {
 				p.observer.PublishError("file.error", f.Name(), err)
 				return
 			}
-			if err := target.Rename(f, result); err != nil {
+			if err := target.Acquire(f, result); err != nil {
 				p.observer.PublishError("file.error", f.Name(), err)
 				return
 			}

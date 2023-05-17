@@ -40,9 +40,9 @@ func TestProcessor_Process(t *testing.T) {
 			StringInfo("3rd"),
 		}, nil)
 		target := mocks.NewTarget(t)
-		target.On("Rename", StringInfo("1st.txt"), "fst").Return(nil).Once()
-		target.On("Rename", StringInfo("2nd.txt"), "snd").Return(nil).Once()
-		target.On("Rename", StringInfo("3rd"), "trd").Return(nil).Once()
+		target.On("Acquire", StringInfo("1st.txt"), "fst").Return(nil).Once()
+		target.On("Acquire", StringInfo("2nd.txt"), "snd").Return(nil).Once()
+		target.On("Acquire", StringInfo("3rd"), "trd").Return(nil).Once()
 		err := processor.Process(source, target)
 		if err != nil {
 			t.Errorf("Expected no error, got %#v", err)
@@ -70,8 +70,8 @@ func TestProcessor_Process(t *testing.T) {
 			StringInfo("3rd"),
 		}, nil)
 		target := mocks.NewTarget(t)
-		target.On("Rename", StringInfo("2nd.txt"), "snd").Return(nil).Once()
-		target.On("Rename", StringInfo("3rd"), "trd").Return(nil).Once()
+		target.On("Acquire", StringInfo("2nd.txt"), "snd").Return(nil).Once()
+		target.On("Acquire", StringInfo("3rd"), "trd").Return(nil).Once()
 		err := processor.Process(source, target)
 		if err != nil {
 			t.Errorf("Expected no error, got %#v", err)
@@ -99,9 +99,9 @@ func TestProcessor_Process(t *testing.T) {
 			StringInfo("3rd"),
 		}, nil)
 		target := mocks.NewTarget(t)
-		target.On("Rename", StringInfo("1st.txt"), "fst").Return(testError).Once()
-		target.On("Rename", StringInfo("2nd.txt"), "snd").Return(nil).Once()
-		target.On("Rename", StringInfo("3rd"), "trd").Return(nil).Once()
+		target.On("Acquire", StringInfo("1st.txt"), "fst").Return(testError).Once()
+		target.On("Acquire", StringInfo("2nd.txt"), "snd").Return(nil).Once()
+		target.On("Acquire", StringInfo("3rd"), "trd").Return(nil).Once()
 		err := processor.Process(source, target)
 		if err != nil {
 			t.Errorf("Expected no error, got %#v", err)

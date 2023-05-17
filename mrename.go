@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	copyFiles    bool
 	dryRun       bool
 	verbose      bool
 	targetDir    string
@@ -17,6 +18,7 @@ var (
 )
 
 func init() {
+	flag.BoolVarP(&copyFiles, "copy", "c", false, "Copy files instead of renaming them")
 	flag.BoolVarP(&dryRun, "dry-run", "n", false, "Do not actually rename files")
 	flag.BoolVarP(&verbose, "verbose", "v", false, "Show detailed output")
 	flag.StringVarP(&targetDir, "target", "t", "", "Specify the target directory")
@@ -53,15 +55,9 @@ func main() {
 	processor := NewProcessor(obsrvr, converter)
 	source := file.NewSource(".")
 
-	var target Target
-	if dryRun {
-		target = &file.VoidTarget{}
-	} else {
-		var err error
-		target, err = file.CreateTarget(targetDir)
-		if err != nil {
-			log.Fatal("error: create target: ", err)
-		}
+	target, err := createTarget(targetDir)
+	if err != nil {
+		log.Fatal("error: create target: ", err)
 	}
 
 	if err := processor.Process(source, target); err != nil {
@@ -73,4 +69,14 @@ func main() {
 		log.Fatal("error: output: ", err)
 	}
 	fmt.Print(output)
+}
+
+func createTarget(path string) (file.Target, error) {
+	if dryRun {
+		return file.NewVoidTarget(), nil
+	}
+	if copyFiles {
+		return file.CreateCopyTarget(path)
+	}
+	return file.CreateMoveTarget(path)
 }
