@@ -1,10 +1,10 @@
-package producer_test
+package file_test
 
 import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"github.com/d-ashesss/mrename/producer"
+	"github.com/d-ashesss/mrename/file"
 	"strings"
 	"sync"
 	"testing"
@@ -18,10 +18,10 @@ func (f FailingReader) Read(_ []byte) (int, error) {
 	return 0, f.Error
 }
 
-func TestMD5_Produce(t *testing.T) {
+func TestHashProducer(t *testing.T) {
 	t.Run("produce", func(t *testing.T) {
 		buf := strings.NewReader("testing content")
-		p := producer.MD5{}
+		p := file.MD5Producer{}
 		got, err := p.Produce(buf)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
@@ -45,7 +45,7 @@ func TestMD5_Produce(t *testing.T) {
 			"nineth":  fmt.Sprintf("%x", md5.Sum([]byte("nineth"))),
 			"tenth":   fmt.Sprintf("%x", md5.Sum([]byte("tenth"))),
 		}
-		p := producer.MD5{}
+		p := file.MD5Producer{}
 
 		var wg sync.WaitGroup
 		wg.Add(len(strs))
@@ -65,7 +65,7 @@ func TestMD5_Produce(t *testing.T) {
 	t.Run("failing reader", func(t *testing.T) {
 		testError := errors.New("fail")
 		buffer := FailingReader{testError}
-		p := producer.MD5{}
+		p := file.MD5Producer{}
 		_, err := p.Produce(buffer)
 		if err == nil {
 			t.Error("Expected error, none given")

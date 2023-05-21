@@ -1,7 +1,6 @@
 package file
 
 import (
-	"github.com/d-ashesss/mrename/producer"
 	"io"
 	"path"
 	"path/filepath"
@@ -57,11 +56,11 @@ func (c *contentConverter) Convert(i Info) (string, error) {
 }
 
 func NewMD5Converter() Converter {
-	return &contentConverter{producer: producer.MD5{}}
+	return &contentConverter{producer: MD5Producer{}}
 }
 
 func NewSHA1Converter() Converter {
-	return &contentConverter{producer: producer.SHA1{}}
+	return &contentConverter{producer: SHA1Producer{}}
 }
 
 type toLowerConverter struct {
