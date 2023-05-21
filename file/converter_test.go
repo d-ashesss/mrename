@@ -49,6 +49,20 @@ func TestToLowerConverter(t *testing.T) {
 	}
 }
 
+func TestToUpperConverter(t *testing.T) {
+	setTestFs(t)
+	i := StringInfo("source/1st.txt")
+	c := file.NewToUpperConverter()
+	got, err := c.Convert(i)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	expected := "1ST.TXT"
+	if expected != got {
+		t.Errorf("Expected new name %q, got %q", expected, got)
+	}
+}
+
 func TestJpeg2JpgConverter(t *testing.T) {
 	t.Run("jpeg", func(t *testing.T) {
 		setTestFs(t)

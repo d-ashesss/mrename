@@ -44,6 +44,8 @@ func main() {
 			c = file.NewSHA1Converter()
 		case "tolower":
 			c = file.NewToLowerConverter()
+		case "toupper":
+			c = file.NewToUpperConverter()
 		case "jpeg2jpg":
 			c = file.NewJpeg2JpgConverter()
 		default:

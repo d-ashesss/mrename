@@ -77,6 +77,19 @@ func NewToLowerConverter() Converter {
 	return &toLowerConverter{}
 }
 
+type toUpperConverter struct {
+	converterChain
+}
+
+func (c *toUpperConverter) Convert(i Info) (string, error) {
+	newName := strings.ToUpper(i.Name())
+	return c.convertNext(i, newName)
+}
+
+func NewToUpperConverter() Converter {
+	return &toUpperConverter{}
+}
+
 type jpeg2JpgConverter struct {
 	converterChain
 }
