@@ -42,7 +42,7 @@ func TestHashProducer(t *testing.T) {
 			"sixth":   fmt.Sprintf("%x", md5.Sum([]byte("sixth"))),
 			"seventh": fmt.Sprintf("%x", md5.Sum([]byte("seventh"))),
 			"eights":  fmt.Sprintf("%x", md5.Sum([]byte("eights"))),
-			"nineth":  fmt.Sprintf("%x", md5.Sum([]byte("nineth"))),
+			"ninth":   fmt.Sprintf("%x", md5.Sum([]byte("ninth"))),
 			"tenth":   fmt.Sprintf("%x", md5.Sum([]byte("tenth"))),
 		}
 		p := file.MD5Producer{}
